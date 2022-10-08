@@ -70,7 +70,6 @@ impl AStar for Matrix<Node> {
 
                         if !visited || g_score < g_score_n {
                             // detect closest entanglement index which is not yet visited, or goal
-                            // targets
                             let target = targets
                                 .clone()
                                 .into_iter()
@@ -87,11 +86,10 @@ impl AStar for Matrix<Node> {
                                         Ordering::Equal
                                     }
                                 });
-                            let target = match target {
-                                Some(value) => value,
-                                _ => goal,
-                            };
-                            let h = heuristic(index, target);
+                            let h = heuristic(
+                                index,
+                                target.unwrap_or(goal),
+                            );
                             let path_node = PathNode {
                                 index: index,
                                 parent: Some(current.index),
