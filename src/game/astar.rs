@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 use std::fs::File;
 use std::io::{Read, Write};
@@ -16,11 +15,11 @@ pub trait AStar {
         &self,
         start: Coordinates,
         goal: Coordinates,
-        heuristic: &dyn Fn(Coordinates, Coordinates) -> i32,
+        heuristic: &dyn Fn(&Coordinates, &Coordinates) -> i32,
     ) -> Option<Vec<Coordinates>>;
 }
 
-pub fn manhattan_heuristic(a: Coordinates, b: Coordinates) -> i32 {
+pub fn manhattan_heuristic(a: &Coordinates, b: &Coordinates) -> i32 {
     let dx = (b.0 as i32 - a.0 as i32).abs();
     let dy = (b.1 as i32 - a.1 as i32).abs();
 
@@ -32,7 +31,7 @@ impl AStar for Matrix<Node> {
         &self,
         start: Coordinates,
         goal: Coordinates,
-        heuristic: &dyn Fn(Coordinates, Coordinates) -> i32,
+        heuristic: &dyn Fn(&Coordinates, &Coordinates) -> i32,
     ) -> Option<Vec<Coordinates>> {
         let mut open = BinaryHeap::from([PathNode::initial(start, goal, heuristic)]);
         let mut closed = HashMap::new();
@@ -64,32 +63,17 @@ impl AStar for Matrix<Node> {
             for n in self.nearest_neighbours(current.index) {
                 if let Some(index) = n {
                     if !closed.contains_key(&index) {
-                        let visited = lookup.contains_key(&index);
-                        let g_score_n = if visited { lookup[&index] } else { WEIGHT };
+                        let visited = lookup.get(&index);
+                        let g_score_n = *visited.unwrap_or(&WEIGHT);
                         let g_score = g_score_self + g_score_n;
 
-                        if !visited || g_score < g_score_n {
+                        if visited.is_none() || g_score < g_score_n {
                             // detect closest entanglement index which is not yet visited, or goal
                             let target = targets
-                                .clone()
-                                .into_iter()
-                                .filter(|t| !lookup.contains_key(t))
-                                .min_by(|a, b| {
-                                    let d_a = heuristic(index, *a);
-                                    let d_b = heuristic(index, *b);
-
-                                    if d_a < d_b {
-                                        Ordering::Less
-                                    } else if d_a > d_b {
-                                        Ordering::Greater
-                                    } else {
-                                        Ordering::Equal
-                                    }
-                                });
-                            let h = heuristic(
-                                index,
-                                target.unwrap_or(goal),
-                            );
+                                .iter()
+                                .filter(|t| !lookup.contains_key(*t))
+                                .min_by(|a, b| heuristic(&index, *a).cmp(&heuristic(&index, *b)));
+                            let h = heuristic(&index, target.unwrap_or(&goal));
                             let path_node = PathNode {
                                 index: index,
                                 parent: Some(current.index),
@@ -98,7 +82,7 @@ impl AStar for Matrix<Node> {
                                 g: g_score,
                             };
 
-                            if visited {
+                            if visited.is_some() {
                                 open.retain(|node| node.index != index);
                             }
 

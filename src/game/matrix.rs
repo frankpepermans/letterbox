@@ -26,14 +26,6 @@ where
         }
     }
 
-    pub fn rows(&self) -> usize {
-        self.rows
-    }
-
-    pub fn cols(&self) -> usize {
-        self.cols
-    }
-
     pub fn entangle(&mut self, left: Coordinates, right: Coordinates) {
         self.entanglements.push((left, right));
     }

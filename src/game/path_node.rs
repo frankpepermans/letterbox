@@ -10,12 +10,11 @@ pub struct PathNode {
 }
 
 impl PathNode {
-    pub fn initial(
-        index: Coordinates,
-        goal: Coordinates,
-        heuristic: &dyn Fn(Coordinates, Coordinates) -> i32,
-    ) -> Self {
-        let h = heuristic(index, goal);
+    pub fn initial<H>(index: Coordinates, goal: Coordinates, heuristic: H) -> Self
+    where
+        H: Fn(&Coordinates, &Coordinates) -> i32,
+    {
+        let h = heuristic(&index, &goal);
 
         PathNode {
             index: index,
