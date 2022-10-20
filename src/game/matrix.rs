@@ -1,8 +1,10 @@
 use std::ops::{Index, IndexMut};
 
+use bevy::prelude::Component;
+
 use super::coordinates::{Coordinates, CreateCoordinates};
 
-#[derive(Debug, Clone)]
+#[derive(Component, Debug, Clone)]
 pub struct Matrix<T> {
     pub vec: Vec<T>,
     pub rows: usize,
@@ -28,6 +30,15 @@ where
 
     pub fn entangle(&mut self, left: Coordinates, right: Coordinates) {
         self.entanglements.push((left, right));
+    }
+}
+
+impl<T> IntoIterator for Matrix<T> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.vec.into_iter()
     }
 }
 

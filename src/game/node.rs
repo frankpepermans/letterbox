@@ -1,5 +1,7 @@
 use std::ops::{Index, IndexMut};
 
+use bevy::prelude::Component;
+
 pub enum Entry {
     LEFT,
     TOP,
@@ -7,7 +9,7 @@ pub enum Entry {
     BOTTOM,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Component, Debug, Clone, Copy)]
 pub struct Node {
     pub left: bool,
     pub top: bool,

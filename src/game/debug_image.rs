@@ -1,8 +1,6 @@
 use raster::{Color, Image};
 
-use crate::Matrix;
-
-use super::node::Node;
+use super::{matrix::Matrix, node::Node};
 
 pub trait DebugImage {
     fn debug_image(&self, file_path: &str, path: Vec<(usize, usize)>);

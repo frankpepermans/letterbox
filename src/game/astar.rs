@@ -1,10 +1,7 @@
 use std::collections::{BinaryHeap, HashMap};
-use std::fs::File;
-use std::io::{Read, Write};
-
-use crate::Matrix;
 
 use super::coordinates::Coordinates;
+use super::matrix::Matrix;
 use super::movement::Movement;
 use super::{node::Node, path_node::PathNode};
 
@@ -36,50 +33,38 @@ impl AStar for Matrix<Node> {
         let mut open = BinaryHeap::from([PathNode::initial(start, goal, heuristic)]);
         let mut closed = HashMap::new();
         let mut lookup = HashMap::from([(start, 0)]);
-        let mut targets =
-            Vec::from_iter(self.entanglements.iter().map(|e| vec![e.0, e.1]).flatten());
-
-        targets.push(goal);
+        let targets = Vec::from_iter(self.entanglements.iter().map(|e| vec![e.0, e.1]).flatten());
 
         while let Some(current) = open.pop() {
-            let mut current = current;
-
             if current.index == goal {
-                let mut path = vec![current];
-
-                while let Some(parent) = current.parent {
-                    current = closed[&parent];
-
-                    path.insert(0, current);
-                }
-
-                return Some(path.iter().map(|it| it.index).collect());
+                return Some(to_path(current, closed));
             }
 
             closed.insert(current.index, current);
 
-            let g_score_self = lookup.entry(current.index).or_insert(WEIGHT).clone();
+            let g_score_self = *lookup.get(&current.index).unwrap_or(&WEIGHT);
 
             for n in self.nearest_neighbours(current.index) {
                 if let Some(index) = n {
                     if !closed.contains_key(&index) {
                         let visited = lookup.get(&index);
                         let g_score_n = *visited.unwrap_or(&WEIGHT);
-                        let g_score = g_score_self + g_score_n;
+                        let g = g_score_self + g_score_n;
 
-                        if visited.is_none() || g_score < g_score_n {
+                        if visited.is_none() || g < g_score_n {
                             // detect closest entanglement index which is not yet visited, or goal
                             let target = targets
                                 .iter()
                                 .filter(|t| !lookup.contains_key(*t))
                                 .min_by(|a, b| heuristic(&index, *a).cmp(&heuristic(&index, *b)));
+
                             let h = heuristic(&index, target.unwrap_or(&goal));
                             let path_node = PathNode {
-                                index: index,
+                                index,
                                 parent: Some(current.index),
-                                f: g_score + h,
-                                h: h,
-                                g: g_score,
+                                f: g + h,
+                                h,
+                                g,
                             };
 
                             if visited.is_some() {
@@ -87,7 +72,7 @@ impl AStar for Matrix<Node> {
                             }
 
                             open.push(path_node);
-                            lookup.insert(index, g_score);
+                            lookup.insert(index, g);
                         }
                     }
                 }
@@ -98,76 +83,16 @@ impl AStar for Matrix<Node> {
     }
 }
 
-impl From<EncodedMatrix> for Matrix<Node> {
-    fn from(encoded: EncodedMatrix) -> Self {
-        Matrix {
-            vec: encoded
-                .cells
-                .iter()
-                .map(|it| it.to_owned().into())
-                .collect(),
-            rows: encoded.rows,
-            cols: encoded.cols,
-            entanglements: Vec::new(),
-        }
-    }
-}
+#[inline(always)]
+fn to_path(node: PathNode, closed: HashMap<(usize, usize), PathNode>) -> Vec<Coordinates> {
+    let mut path = vec![node.index];
+    let mut current = node;
 
-impl Into<EncodedMatrix> for Matrix<Node> {
-    fn into(self) -> EncodedMatrix {
-        EncodedMatrix {
-            cells: self.vec.iter().map(|it| it.to_owned().into()).collect(),
-            rows: self.rows,
-            cols: self.cols,
-        }
-    }
-}
+    while let Some(parent) = current.parent {
+        current = closed[&parent];
 
-#[derive(Debug)]
-pub struct EncodedMatrix {
-    pub cells: Vec<u8>,
-    pub rows: usize,
-    pub cols: usize,
-}
-
-impl EncodedMatrix {
-    pub fn to_file(&self, file_name: &str) -> std::io::Result<()> {
-        let mut data = vec![self.rows as u8, self.cols as u8];
-
-        data.append(&mut self.cells.clone());
-
-        let mut e = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
-
-        e.write_all(&data).expect("could not write to file");
-
-        let data = e.finish().expect("could not zip bytes");
-
-        let mut pos = 0;
-        let mut buffer = File::create(file_name)?;
-
-        while pos < data.len() {
-            let bytes_written = buffer.write(&data[pos..])?;
-            pos += bytes_written;
-        }
-
-        Ok(())
+        path.insert(0, current.index);
     }
 
-    pub fn from_file(file_name: &str) -> Self {
-        let raw = std::fs::read(file_name).expect("could not read from file");
-
-        let mut z = flate2::read::ZlibDecoder::new(&raw[..]);
-        let mut v: Vec<u8> = Vec::new();
-
-        z.read_to_end(&mut v).expect("could not read to vector");
-
-        let rows = v.remove(0);
-        let cols = v.remove(0);
-
-        Self {
-            rows: rows as usize,
-            cols: cols as usize,
-            cells: v,
-        }
-    }
+    path
 }

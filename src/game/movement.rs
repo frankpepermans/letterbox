@@ -1,6 +1,5 @@
-use crate::Matrix;
-
 use super::coordinates::{Coordinates, CreateCoordinates};
+use super::matrix::Matrix;
 use super::node::Node;
 
 pub trait Movement {

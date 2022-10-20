@@ -1,10 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use letterbox::{
-    game::{
-        astar::{manhattan_heuristic, AStar},
-        node::{Entry, Node},
-    },
-    Matrix,
+use letterbox::game::{
+    astar::{manhattan_heuristic, AStar},
+    matrix::Matrix,
+    node::{Entry, Node},
 };
 
 fn astar(s: usize) -> Option<Vec<(usize, usize)>> {

@@ -1,12 +1,17 @@
 use std::sync::Arc;
 
+use bevy::prelude::*;
 use letterbox::{
+    actors::{grid::GridPlugin, robot::RobotPlugin},
     game::{
-        astar::{manhattan_heuristic, AStar, EncodedMatrix},
+        astar::{manhattan_heuristic, AStar},
+        coordinates::Coordinates,
         debug_image::DebugImage,
+        encoded_matrix::EncodedMatrix,
+        matrix::Matrix,
         node::Node,
     },
-    Matrix,
+    GridSize, RobotCount,
 };
 use tokio::{join, spawn};
 
@@ -60,4 +65,27 @@ async fn main() {
             m.debug_image("test.png", path);
         }
     }
+
+    App::new()
+        .insert_resource(WindowDescriptor {
+            width: 1024.0,
+            height: 768.0,
+            ..Default::default()
+        })
+        .insert_resource(GridSize((24, 240)))
+        .insert_resource(RobotCount(1))
+        .add_startup_system(setup_system)
+        .add_plugins(DefaultPlugins)
+        .add_plugin(GridPlugin)
+        .add_plugin(RobotPlugin)
+        .run();
 }
+
+fn setup_system(mut commands: Commands) {
+    commands.spawn().insert_bundle(Camera2dBundle::default());
+
+    //commands.spawn().insert(Person).insert(Name("Elaina Proctor".to_string()));
+}
+
+#[derive(Component)]
+struct Player(Coordinates);
