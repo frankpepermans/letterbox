@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::{
     game::node::Node,
     game::{matrix::Matrix, node::Entry},
-    GridSize, Position,
+    GridSize, NodeSize, Position,
 };
 
 pub struct GridPlugin;
@@ -34,6 +34,7 @@ fn setup_system(mut commands: Commands, size: Res<GridSize>) {
 fn node_system(
     mut commands: Commands,
     size: Res<GridSize>,
+    node_size: Res<NodeSize>,
     query: Query<&Matrix<Node>, Added<Matrix<Node>>>,
 ) {
     for matrix in &query {
@@ -49,7 +50,7 @@ fn node_system(
                 .insert(Position((row, col)))
                 .insert_bundle(SpriteBundle {
                     sprite: Sprite {
-                        custom_size: Some(Vec2::new(20.0, 20.0)),
+                        custom_size: Some(Vec2::new(node_size.0 .0, node_size.0 .1)),
                         ..default()
                     },
                     ..default()
@@ -60,16 +61,17 @@ fn node_system(
 
 fn render_grid_system(
     window: Res<WindowDescriptor>,
+    node_size: Res<NodeSize>,
     mut query: Query<
         (&Node, &Position, &mut Transform, &mut Sprite),
         Or<(Changed<Node>, Changed<Position>)>,
     >,
 ) {
     for (node, position, mut transform, mut sprite) in &mut query {
-        let (w, h) = (window.width, window.height);
-
-        transform.translation.x = -w / 2. + position.0 .1 as f32 * 20.0;
-        transform.translation.y = h / 2. - position.0 .0 as f32 * 20.0;
+        transform.translation.x =
+            -window.width / 2. + position.0 .1 as f32 * node_size.0 .0 + node_size.0 .0 / 2.;
+        transform.translation.y =
+            window.height / 2. - position.0 .0 as f32 * node_size.0 .1 - node_size.0 .1 / 2.;
 
         sprite.color = match node[Entry::LEFT] {
             true => Color::rgb(0.25, 0.25, 0.75),
@@ -81,28 +83,31 @@ fn render_grid_system(
 fn input_system(
     mouse: Res<Input<MouseButton>>,
     windows: Res<Windows>,
+    node_size: Res<NodeSize>,
     mut lookup_query: Query<(&mut Node, &Position)>,
     mut query: Query<(&mut Matrix<Node>,)>,
 ) {
     if mouse.just_pressed(MouseButton::Left) {
         if let Some(window) = windows.get_primary() {
-            let (_w, h) = (window.width(), window.height());
+            let h = window.height();
 
             if let Some(pos) = window.cursor_position() {
-                let row = (h - pos[1] + 10.) / 20.;
-                let col = (pos[0] + 10.) / 20.;
+                let row = (h - pos[1]) / node_size.0 .0;
+                let col = pos[0] / node_size.0 .1;
                 let coordinates = (row.floor() as usize, col.floor() as usize);
 
                 for (mut matrix,) in &mut query {
-                    if matrix[coordinates].left {
-                        matrix[coordinates] = Node::closed();
-                    } else {
-                        matrix[coordinates] = Node::open();
-                    }
+                    if matrix.rows > coordinates.0 && matrix.cols > coordinates.1 {
+                        if matrix[coordinates].left {
+                            matrix[coordinates] = Node::closed();
+                        } else {
+                            matrix[coordinates] = Node::open();
+                        }
 
-                    for (mut node, position) in &mut lookup_query {
-                        if position.0 .0 == coordinates.0 && position.0 .1 == coordinates.1 {
-                            *node = matrix[coordinates];
+                        for (mut node, position) in &mut lookup_query {
+                            if position.0 .0 == coordinates.0 && position.0 .1 == coordinates.1 {
+                                *node = matrix[coordinates];
+                            }
                         }
                     }
                 }

@@ -6,7 +6,9 @@ use game::coordinates::Coordinates;
 pub mod actors;
 pub mod game;
 
-pub struct GridSize(pub Coordinates);
+pub struct GridSize(pub (usize, usize));
+
+pub struct NodeSize(pub (f32, f32));
 
 #[derive(Component, Debug)]
 pub struct Position(pub Coordinates);

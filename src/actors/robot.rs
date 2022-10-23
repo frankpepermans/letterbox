@@ -8,7 +8,7 @@ use crate::{
         node::Node,
     },
     game::{coordinates::Coordinates, matrix::Matrix},
-    RobotCount,
+    NodeSize, RobotCount,
 };
 
 #[derive(Component)]
@@ -56,7 +56,7 @@ impl Plugin for RobotPlugin {
     }
 }
 
-fn setup_system(mut commands: Commands, robot_count: Res<RobotCount>) {
+fn setup_system(mut commands: Commands, node_size: Res<NodeSize>, robot_count: Res<RobotCount>) {
     (0..robot_count.0).for_each(|index| {
         commands
             .spawn()
@@ -74,7 +74,7 @@ fn setup_system(mut commands: Commands, robot_count: Res<RobotCount>) {
             })
             .insert_bundle(SpriteBundle {
                 sprite: Sprite {
-                    custom_size: Some(Vec2::new(20.0, 20.0)),
+                    custom_size: Some(Vec2::new(node_size.0 .0, node_size.0 .1)),
                     ..default()
                 },
                 ..default()
@@ -83,7 +83,7 @@ fn setup_system(mut commands: Commands, robot_count: Res<RobotCount>) {
 }
 
 fn calc_path(
-    m_query: Query<(&Matrix<Node>,), Or<(Changed<Matrix<Node>>,)>>,
+    m_query: Query<(&Matrix<Node>,), Changed<Matrix<Node>>>,
     mut query: Query<
         (&StartPosition, &EndPosition, &mut Path, &mut TraversalIndex),
         With<AnimationSequence>,
@@ -104,22 +104,17 @@ fn calc_path(
 
 fn increment_path_traversal(
     time: Res<Time>,
-    mut query: Query<
-        (&Path, &mut TraversalIndex, &mut AnimationSequence),
-        Or<(Changed<TraversalIndex>,)>,
-    >,
+    mut query: Query<(&Path, &mut TraversalIndex, &mut AnimationSequence), Changed<TraversalIndex>>,
 ) {
     for (path, mut traversal_index, mut animation_sequence) in &mut query {
-        if let Some(path) = &path.0 {
-            if let Some(index) = traversal_index.0 {
-                if index < path.len() - 1 {
-                    *animation_sequence = AnimationSequence {
-                        duration: animation_sequence.duration,
-                        snap: Some(time.time_since_startup()),
-                    };
-                } else {
-                    *traversal_index = TraversalIndex(Some(0));
-                }
+        if let (Some(path), Some(index)) = (&path.0, traversal_index.0) {
+            if index < path.len() - 1 {
+                *animation_sequence = AnimationSequence {
+                    duration: animation_sequence.duration,
+                    snap: Some(time.time_since_startup()),
+                };
+            } else {
+                *traversal_index = TraversalIndex(Some(0));
             }
         }
     }
@@ -128,6 +123,7 @@ fn increment_path_traversal(
 fn traverse_path(
     time: Res<Time>,
     window: Res<WindowDescriptor>,
+    node_size: Res<NodeSize>,
     mut query: Query<(
         &Path,
         &AnimationSequence,
@@ -136,35 +132,37 @@ fn traverse_path(
     )>,
 ) {
     for (path, animation_sequence, mut transform, mut traversal_index) in &mut query {
-        if let Some(path) = &path.0 {
-            if let Some(index) = traversal_index.0 {
-                if let Some(start_duration) = animation_sequence.snap {
-                    if index < path.len() - 1 {
-                        let delta = time.time_since_startup() - start_duration;
-                        let delta_factor = delta.as_millis() as f32
-                            / animation_sequence.duration.as_millis() as f32;
-                        let at_end = delta_factor > 1.0;
-                        let delta_factor = delta_factor.clamp(0., 1.);
-                        let from = path[index];
-                        let to = path[index + 1];
-                        let row_0 = from.0 as f32;
-                        let row_1 = to.0 as f32;
-                        let col_0 = from.1 as f32;
-                        let col_1 = to.1 as f32;
-                        let position = (
-                            row_0 + (row_1 - row_0) * delta_factor,
-                            col_0 + (col_1 - col_0) * delta_factor,
-                        );
-                        let (w, h) = (window.width, window.height);
+        let params = (&path.0, traversal_index.0, animation_sequence.snap);
 
-                        transform.translation.x = -w / 2. + position.1 as f32 * 20.0;
-                        transform.translation.y = h / 2. - position.0 as f32 * 20.0;
-                        transform.translation.z = 100.;
+        if let (Some(path), Some(index), Some(start_duration)) = params {
+            if index < path.len() - 1 {
+                let delta = time.time_since_startup() - start_duration;
+                let mut delta_factor =
+                    delta.as_millis() as f32 / animation_sequence.duration.as_millis() as f32;
+                let at_end = delta_factor > 1.;
 
-                        if at_end {
-                            *traversal_index = TraversalIndex(Some(index + 1));
-                        }
-                    }
+                delta_factor = delta_factor.clamp(0., 1.);
+
+                let from = path[index];
+                let to = path[index + 1];
+                let row_0 = from.0 as f32;
+                let row_1 = to.0 as f32;
+                let col_0 = from.1 as f32;
+                let col_1 = to.1 as f32;
+                let position = (
+                    row_0 + (row_1 - row_0) * delta_factor,
+                    col_0 + (col_1 - col_0) * delta_factor,
+                );
+                let (w, h) = (window.width, window.height);
+
+                transform.translation.x =
+                    -w / 2. + position.1 as f32 * node_size.0 .0 + node_size.0 .0 / 2.;
+                transform.translation.y =
+                    h / 2. - position.0 as f32 * node_size.0 .1 - node_size.0 .1 / 2.;
+                transform.translation.z = 100.;
+
+                if at_end {
+                    *traversal_index = TraversalIndex(Some(index + 1));
                 }
             }
         }
