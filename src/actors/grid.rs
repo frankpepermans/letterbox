@@ -11,7 +11,9 @@ pub struct GridPlugin;
 impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_system)
-            .add_system(render_grid_system);
+            .add_system(node_system)
+            .add_system(render_grid_system)
+            .add_system(input_system);
     }
 
     fn name(&self) -> &str {
@@ -26,24 +28,34 @@ fn setup_system(mut commands: Commands, size: Res<GridSize>) {
 
     prepare_grid(&mut m);
 
-    m.vec.iter().enumerate().for_each(|(index, node)| {
-        let row = index / cols;
-        let col = index % cols;
-
-        commands
-            .spawn()
-            .insert(*node)
-            .insert(Position((row, col)))
-            .insert_bundle(SpriteBundle {
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(20.0, 20.0)),
-                    ..default()
-                },
-                ..default()
-            });
-    });
-
     commands.spawn().insert(m);
+}
+
+fn node_system(
+    mut commands: Commands,
+    size: Res<GridSize>,
+    query: Query<&Matrix<Node>, Added<Matrix<Node>>>,
+) {
+    for matrix in &query {
+        let cols = size.0 .1;
+
+        matrix.vec.iter().enumerate().for_each(|(index, node)| {
+            let row = index / cols;
+            let col = index % cols;
+
+            commands
+                .spawn()
+                .insert(*node)
+                .insert(Position((row, col)))
+                .insert_bundle(SpriteBundle {
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(20.0, 20.0)),
+                        ..default()
+                    },
+                    ..default()
+                });
+        });
+    }
 }
 
 fn render_grid_system(
@@ -63,6 +75,39 @@ fn render_grid_system(
             true => Color::rgb(0.25, 0.25, 0.75),
             false => Color::rgb(0.75, 0.25, 0.25),
         };
+    }
+}
+
+fn input_system(
+    mouse: Res<Input<MouseButton>>,
+    windows: Res<Windows>,
+    mut lookup_query: Query<(&mut Node, &Position)>,
+    mut query: Query<(&mut Matrix<Node>,)>,
+) {
+    if mouse.just_pressed(MouseButton::Left) {
+        if let Some(window) = windows.get_primary() {
+            let (_w, h) = (window.width(), window.height());
+
+            if let Some(pos) = window.cursor_position() {
+                let row = (h - pos[1] + 10.) / 20.;
+                let col = (pos[0] + 10.) / 20.;
+                let coordinates = (row.floor() as usize, col.floor() as usize);
+
+                for (mut matrix,) in &mut query {
+                    if matrix[coordinates].left {
+                        matrix[coordinates] = Node::closed();
+                    } else {
+                        matrix[coordinates] = Node::open();
+                    }
+
+                    for (mut node, position) in &mut lookup_query {
+                        if position.0 .0 == coordinates.0 && position.0 .1 == coordinates.1 {
+                            *node = matrix[coordinates];
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
