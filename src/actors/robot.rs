@@ -121,11 +121,11 @@ fn calc_path(
                 DefaultPath(matrix.astar(start_position.0, end_position.0, &manhattan_heuristic));
 
             if is_traversing {
-                *path = Path(default_path.0.clone());
+                *path = Path(default_path.0.to_owned());
                 *traversal_index = TraversalIndex(
                     default_path
                         .0
-                        .clone()
+                        .to_owned()
                         .unwrap_or_default()
                         .iter()
                         .position(|it| it == &current_position.0),
@@ -140,7 +140,7 @@ fn calc_path(
                     *traversal_index = TraversalIndex(Some(0));
                 }
             } else if traversal_index.0.is_none() || path.0.is_none() {
-                *path = Path(default_path.0.clone());
+                *path = Path(default_path.0.to_owned());
                 *traversal_index = TraversalIndex(Some(0));
             }
         }
@@ -186,7 +186,7 @@ fn increment_path_traversal(
                 }
             } else {
                 *current_position = Position(start_position.0);
-                *path = Path(default_path.0.clone());
+                *path = Path(default_path.0.to_owned());
                 *traversal_index = TraversalIndex(Some(0));
             }
         }
