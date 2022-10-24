@@ -59,6 +59,15 @@ impl Into<u8> for Node {
     }
 }
 
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        self.left == other.left
+            && self.top == other.top
+            && self.right == other.right
+            && self.bottom == other.bottom
+    }
+}
+
 impl Index<Entry> for Node {
     type Output = bool;
 

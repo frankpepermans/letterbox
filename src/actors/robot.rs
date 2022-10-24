@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
+use rand::prelude::*;
 
 use crate::{
     game::{
@@ -8,7 +9,7 @@ use crate::{
         node::Node,
     },
     game::{coordinates::Coordinates, matrix::Matrix},
-    NodeSize, RobotCount,
+    NodeSize, Position, RobotCount,
 };
 
 #[derive(Component)]
@@ -21,17 +22,22 @@ struct EndPosition(Coordinates);
 struct Path(Option<Vec<Coordinates>>);
 
 #[derive(Component)]
+struct DefaultPath(Option<Vec<Coordinates>>);
+
+#[derive(Component)]
 struct TraversalIndex(Option<usize>);
 
 #[derive(Bundle)]
 struct PathInstructionsBundle {
     start_position: StartPosition,
     end_position: EndPosition,
+    current_position: Position,
 }
 
 #[derive(Bundle)]
 struct PathBundle {
     path: Path,
+    default_path: DefaultPath,
     traversal_index: TraversalIndex,
 }
 
@@ -57,19 +63,25 @@ impl Plugin for RobotPlugin {
 }
 
 fn setup_system(mut commands: Commands, node_size: Res<NodeSize>, robot_count: Res<RobotCount>) {
-    (0..robot_count.0).for_each(|index| {
+    let mut rng = rand::thread_rng();
+
+    (0..robot_count.0).for_each(|_| {
+        let index = (rng.gen::<f32>() * 24.) as usize;
+
         commands
             .spawn()
             .insert_bundle(PathInstructionsBundle {
-                start_position: StartPosition((index as usize, 0)),
-                end_position: EndPosition((index as usize, 49)),
+                start_position: StartPosition((index, 0)),
+                end_position: EndPosition((index, 49)),
+                current_position: Position((index, 0)),
             })
             .insert_bundle(PathBundle {
                 path: Path(None),
+                default_path: DefaultPath(None),
                 traversal_index: TraversalIndex(None),
             })
             .insert(AnimationSequence {
-                duration: Duration::from_millis(60),
+                duration: Duration::from_millis(25 + (rng.gen::<f32>() * 200.) as u64),
                 snap: None,
             })
             .insert_bundle(SpriteBundle {
@@ -83,19 +95,52 @@ fn setup_system(mut commands: Commands, node_size: Res<NodeSize>, robot_count: R
 }
 
 fn calc_path(
-    m_query: Query<(&Matrix<Node>,), Changed<Matrix<Node>>>,
-    mut query: Query<
-        (&StartPosition, &EndPosition, &mut Path, &mut TraversalIndex),
-        With<AnimationSequence>,
-    >,
+    m_query: Query<&Matrix<Node>, Changed<Matrix<Node>>>,
+    mut query: Query<(
+        &StartPosition,
+        &Position,
+        &EndPosition,
+        &mut Path,
+        &mut DefaultPath,
+        &mut TraversalIndex,
+    )>,
 ) {
-    for (matrix,) in &m_query {
-        for (start_position, end_position, mut path, mut traversal_index) in &mut query {
-            let p = matrix.astar(start_position.0, end_position.0, &manhattan_heuristic);
+    for matrix in &m_query {
+        for (
+            start_position,
+            current_position,
+            end_position,
+            mut path,
+            mut default_path,
+            mut traversal_index,
+        ) in &mut query
+        {
+            let is_traversing = start_position.0 != current_position.0;
 
-            *path = Path(p);
+            *default_path =
+                DefaultPath(matrix.astar(start_position.0, end_position.0, &manhattan_heuristic));
 
-            if traversal_index.0.is_none() {
+            if is_traversing {
+                *path = Path(default_path.0.clone());
+                *traversal_index = TraversalIndex(
+                    default_path
+                        .0
+                        .clone()
+                        .unwrap_or_default()
+                        .iter()
+                        .position(|it| it == &current_position.0),
+                );
+
+                if path.0.is_none() || traversal_index.0.is_none() {
+                    *path = Path(matrix.astar(
+                        current_position.0,
+                        end_position.0,
+                        &manhattan_heuristic,
+                    ));
+                    *traversal_index = TraversalIndex(Some(0));
+                }
+            } else if traversal_index.0.is_none() || path.0.is_none() {
+                *path = Path(default_path.0.clone());
                 *traversal_index = TraversalIndex(Some(0));
             }
         }
@@ -104,16 +149,44 @@ fn calc_path(
 
 fn increment_path_traversal(
     time: Res<Time>,
-    mut query: Query<(&Path, &mut TraversalIndex, &mut AnimationSequence), Changed<TraversalIndex>>,
+    mut query: Query<
+        (
+            &mut Path,
+            &mut TraversalIndex,
+            &mut AnimationSequence,
+            &mut Position,
+            &StartPosition,
+            &DefaultPath,
+        ),
+        Or<(Changed<TraversalIndex>, Changed<Path>)>,
+    >,
 ) {
-    for (path, mut traversal_index, mut animation_sequence) in &mut query {
-        if let (Some(path), Some(index)) = (&path.0, traversal_index.0) {
-            if index < path.len() - 1 {
-                *animation_sequence = AnimationSequence {
-                    duration: animation_sequence.duration,
-                    snap: Some(time.time_since_startup()),
-                };
+    for (
+        mut path,
+        mut traversal_index,
+        mut animation_sequence,
+        mut current_position,
+        start_position,
+        default_path,
+    ) in &mut query
+    {
+        if let (Some(p), Some(index)) = (&path.0, traversal_index.0) {
+            if index < p.len() - 1 {
+                let did_pos_change = current_position.0 != p[index];
+
+                if did_pos_change {
+                    *current_position = Position(p[index]);
+                }
+
+                if did_pos_change || animation_sequence.snap.is_none() {
+                    *animation_sequence = AnimationSequence {
+                        duration: animation_sequence.duration,
+                        snap: Some(time.time_since_startup()),
+                    };
+                }
             } else {
+                *current_position = Position(start_position.0);
+                *path = Path(default_path.0.clone());
                 *traversal_index = TraversalIndex(Some(0));
             }
         }

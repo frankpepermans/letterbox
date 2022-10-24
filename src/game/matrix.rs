@@ -31,6 +31,10 @@ where
     pub fn entangle(&mut self, left: Coordinates, right: Coordinates) {
         self.entanglements.push((left, right));
     }
+
+    pub fn contains(&self, coordinates: Coordinates) -> bool {
+        self.rows > coordinates.0 && self.cols > coordinates.1
+    }
 }
 
 impl<T> IntoIterator for Matrix<T> {

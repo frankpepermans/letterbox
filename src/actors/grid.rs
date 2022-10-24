@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::{
     game::node::Node,
     game::{matrix::Matrix, node::Entry},
-    GridSize, NodeSize, Position,
+    GridSize, NodeSize, Position, UserCursorPressedState, UserPosition,
 };
 
 pub struct GridPlugin;
@@ -12,8 +12,11 @@ impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_system)
             .add_system(node_system)
+            .add_system(layout_grid_system)
             .add_system(render_grid_system)
-            .add_system(input_system);
+            .add_system(update_user_position_coordinates_system)
+            .add_system(update_user_position_cursor_pressed_system)
+            .add_system(modify_single_node_system);
     }
 
     fn name(&self) -> &str {
@@ -28,7 +31,11 @@ fn setup_system(mut commands: Commands, size: Res<GridSize>) {
 
     prepare_grid(&mut m);
 
-    commands.spawn().insert(m);
+    commands.spawn().insert(m).insert(UserPosition {
+        coordinates: None,
+        cursor_pressed_state: None,
+        target_modification: None,
+    });
 }
 
 fn node_system(
@@ -59,57 +66,133 @@ fn node_system(
     }
 }
 
-fn render_grid_system(
+fn layout_grid_system(
     window: Res<WindowDescriptor>,
     node_size: Res<NodeSize>,
-    mut query: Query<
-        (&Node, &Position, &mut Transform, &mut Sprite),
-        Or<(Changed<Node>, Changed<Position>)>,
-    >,
+    mut query: Query<(&Position, &mut Transform), Or<(Changed<Node>, Changed<Position>)>>,
 ) {
-    for (node, position, mut transform, mut sprite) in &mut query {
+    for (position, mut transform) in &mut query {
         transform.translation.x =
             -window.width / 2. + position.0 .1 as f32 * node_size.0 .0 + node_size.0 .0 / 2.;
         transform.translation.y =
             window.height / 2. - position.0 .0 as f32 * node_size.0 .1 - node_size.0 .1 / 2.;
-
-        sprite.color = match node[Entry::LEFT] {
-            true => Color::rgb(0.25, 0.25, 0.75),
-            false => Color::rgb(0.75, 0.25, 0.25),
-        };
     }
 }
 
-fn input_system(
-    mouse: Res<Input<MouseButton>>,
+fn render_grid_system(
+    pos_query: Query<&UserPosition>,
+    mut query: Query<(&Node, &Position, &mut Sprite)>,
+) {
+    for user_position in &pos_query {
+        for (node, position, mut sprite) in &mut query {
+            if user_position.coordinates == Some(position.0) {
+                sprite.color = match node[Entry::LEFT] {
+                    true => Color::rgb(0.25, 0.5, 0.75),
+                    false => Color::rgb(0.75, 0.5, 0.25),
+                };
+            } else {
+                sprite.color = match node[Entry::LEFT] {
+                    true => Color::rgb(0.25, 0.25, 0.75),
+                    false => Color::rgb(0.75, 0.25, 0.25),
+                };
+            }
+        }
+    }
+}
+
+fn update_user_position_coordinates_system(
     windows: Res<Windows>,
     node_size: Res<NodeSize>,
-    mut lookup_query: Query<(&mut Node, &Position)>,
-    mut query: Query<(&mut Matrix<Node>,)>,
+    mut query: Query<(&mut Matrix<Node>, &mut UserPosition)>,
 ) {
-    if mouse.just_pressed(MouseButton::Left) {
-        if let Some(window) = windows.get_primary() {
-            let h = window.height();
+    if let Some(window) = windows.get_primary() {
+        let h = window.height();
 
-            if let Some(pos) = window.cursor_position() {
-                let row = (h - pos[1]) / node_size.0 .0;
-                let col = pos[0] / node_size.0 .1;
-                let coordinates = (row.floor() as usize, col.floor() as usize);
+        if let Some(pos) = window.cursor_position() {
+            let row = (h - pos[1]) / node_size.0 .0;
+            let col = pos[0] / node_size.0 .1;
+            let coordinates = (row.floor() as usize, col.floor() as usize);
 
-                for (mut matrix,) in &mut query {
-                    if matrix.rows > coordinates.0 && matrix.cols > coordinates.1 {
-                        if matrix[coordinates].left {
-                            matrix[coordinates] = Node::closed();
+            for (matrix, mut user_position) in &mut query {
+                let mut val = user_position.coordinates;
+
+                if matrix.contains(coordinates) {
+                    val = Some(coordinates);
+                }
+
+                if user_position.coordinates != val {
+                    *user_position = UserPosition {
+                        coordinates: val,
+                        cursor_pressed_state: user_position.cursor_pressed_state,
+                        target_modification: user_position.target_modification,
+                    };
+                }
+            }
+        }
+    }
+}
+
+fn update_user_position_cursor_pressed_system(
+    mouse: Res<Input<MouseButton>>,
+    mut query: Query<&mut UserPosition>,
+) {
+    for mut user_position in &mut query {
+        if user_position.coordinates.is_some() {
+            let mut cursor_pressed_state = user_position.cursor_pressed_state;
+            let mut target_modification = user_position.target_modification;
+
+            if mouse.just_pressed(MouseButton::Left) {
+                cursor_pressed_state = Some(UserCursorPressedState::DOWN);
+            } else if mouse.just_released(MouseButton::Left) {
+                cursor_pressed_state = Some(UserCursorPressedState::UP);
+                target_modification = None;
+            }
+
+            if user_position.cursor_pressed_state != cursor_pressed_state {
+                *user_position = UserPosition {
+                    coordinates: user_position.coordinates,
+                    cursor_pressed_state: cursor_pressed_state,
+                    target_modification: target_modification,
+                };
+            }
+        }
+    }
+}
+
+fn modify_single_node_system(
+    mut lookup_query: Query<(&mut Node, &Position)>,
+    mut query: Query<(&mut Matrix<Node>, &mut UserPosition), Changed<UserPosition>>,
+) {
+    for (mut matrix, mut user_position) in &mut query {
+        if let (Some(coordinates), Some(cursor_pressed_state)) = (
+            user_position.coordinates,
+            user_position.cursor_pressed_state,
+        ) {
+            if cursor_pressed_state == UserCursorPressedState::DOWN && matrix.contains(coordinates)
+            {
+                let target_modification =
+                    user_position
+                        .target_modification
+                        .unwrap_or(if matrix[coordinates].left {
+                            Node::closed()
                         } else {
-                            matrix[coordinates] = Node::open();
-                        }
+                            Node::open()
+                        });
 
-                        for (mut node, position) in &mut lookup_query {
-                            if position.0 .0 == coordinates.0 && position.0 .1 == coordinates.1 {
-                                *node = matrix[coordinates];
-                            }
-                        }
+                matrix[coordinates] = target_modification;
+
+                for (mut node, position) in &mut lookup_query {
+                    if position.0 == coordinates {
+                        *node = matrix[coordinates];
                     }
+                }
+
+                if user_position.target_modification != Some(target_modification) {
+                    *user_position = UserPosition {
+                        coordinates: user_position.coordinates,
+                        cursor_pressed_state: user_position.cursor_pressed_state,
+                        target_modification: Some(target_modification),
+                    };
                 }
             }
         }
