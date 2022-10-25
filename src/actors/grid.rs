@@ -13,10 +13,12 @@ impl Plugin for GridPlugin {
         app.add_startup_system(setup_system)
             .add_system(node_system)
             .add_system(layout_grid_system)
-            .add_system(render_grid_system)
+            .add_system(render_grid_system.after(layout_grid_system))
             .add_system(update_user_position_coordinates_system)
             .add_system(update_user_position_cursor_pressed_system)
-            .add_system(modify_single_node_system);
+            .add_system(
+                modify_single_node_system.after(update_user_position_cursor_pressed_system),
+            );
     }
 
     fn name(&self) -> &str {

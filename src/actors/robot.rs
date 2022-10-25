@@ -53,7 +53,7 @@ impl Plugin for RobotPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_system)
             .add_system(calc_path)
-            .add_system(traverse_path)
+            .add_system(traverse_path.after(calc_path))
             .add_system(increment_path_traversal.after(traverse_path));
     }
 
@@ -96,14 +96,17 @@ fn setup_system(mut commands: Commands, node_size: Res<NodeSize>, robot_count: R
 
 fn calc_path(
     m_query: Query<&Matrix<Node>, Changed<Matrix<Node>>>,
-    mut query: Query<(
-        &StartPosition,
-        &Position,
-        &EndPosition,
-        &mut Path,
-        &mut DefaultPath,
-        &mut TraversalIndex,
-    )>,
+    mut query: Query<
+        (
+            &StartPosition,
+            &Position,
+            &EndPosition,
+            &mut Path,
+            &mut DefaultPath,
+            &mut TraversalIndex,
+        ),
+        With<AnimationSequence>,
+    >,
 ) {
     for matrix in &m_query {
         for (
