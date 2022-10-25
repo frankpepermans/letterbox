@@ -53,8 +53,8 @@ impl Plugin for RobotPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_system)
             .add_system(calc_path)
-            .add_system(increment_path_traversal)
-            .add_system(traverse_path);
+            .add_system(traverse_path)
+            .add_system(increment_path_traversal.after(traverse_path));
     }
 
     fn name(&self) -> &str {
@@ -178,7 +178,19 @@ fn increment_path_traversal(
                     *current_position = Position(p[index]);
                 }
 
-                if did_pos_change || animation_sequence.snap.is_none() {
+                let at_end = did_pos_change
+                    || match animation_sequence.snap {
+                        Some(snap) => {
+                            let delta = time.time_since_startup() - snap;
+                            let delta_factor = delta.as_millis() as f32
+                                / animation_sequence.duration.as_millis() as f32;
+
+                            delta_factor >= 1.
+                        }
+                        None => true,
+                    };
+
+                if at_end {
                     *animation_sequence = AnimationSequence {
                         duration: animation_sequence.duration,
                         snap: Some(time.time_since_startup()),
