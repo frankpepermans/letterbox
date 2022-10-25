@@ -1,4 +1,7 @@
-use bevy::prelude::*;
+use bevy::{
+    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+    prelude::*,
+};
 use letterbox::{
     actors::{grid::GridPlugin, robot::RobotPlugin},
     game::coordinates::Coordinates,
@@ -24,6 +27,8 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(GridPlugin)
         .add_plugin(RobotPlugin)
+        .add_plugin(LogDiagnosticsPlugin::default())
+        .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .run();
 }
 

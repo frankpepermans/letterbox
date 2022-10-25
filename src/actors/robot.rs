@@ -6,7 +6,7 @@ use rand::prelude::*;
 use crate::{
     game::{
         astar::{manhattan_heuristic, AStar},
-        node::Node,
+        node::{Entry, Node},
     },
     game::{coordinates::Coordinates, matrix::Matrix},
     NodeSize, Position, RobotCount,
@@ -96,6 +96,7 @@ fn setup_system(mut commands: Commands, node_size: Res<NodeSize>, robot_count: R
 
 fn calc_path(
     m_query: Query<&Matrix<Node>, Changed<Matrix<Node>>>,
+    n_query: Query<(&Position, &Node), Changed<Node>>,
     mut query: Query<
         (
             &StartPosition,
@@ -118,33 +119,56 @@ fn calc_path(
             mut traversal_index,
         ) in &mut query
         {
-            let is_traversing = start_position.0 != current_position.0;
+            let mut affects_path = false;
+            let no_path = path.0.is_none() || traversal_index.0.is_none();
 
-            *default_path =
-                DefaultPath(matrix.astar(start_position.0, end_position.0, &manhattan_heuristic));
+            for (position, node) in &n_query {
+                if node[Entry::LEFT] {
+                    break;
+                }
 
-            if is_traversing {
-                *path = Path(default_path.0.to_owned());
-                *traversal_index = TraversalIndex(
-                    default_path
-                        .0
-                        .to_owned()
-                        .unwrap_or_default()
-                        .iter()
-                        .position(|it| it == &current_position.0),
-                );
+                let p_1 = &default_path.0.to_owned().unwrap_or_default();
+                let p_2 = &path.0.to_owned().unwrap_or_default();
 
-                if path.0.is_none() || traversal_index.0.is_none() {
-                    *path = Path(matrix.astar(
-                        current_position.0,
-                        end_position.0,
-                        &manhattan_heuristic,
-                    ));
+                if p_1.contains(&position.0.to_owned()) || p_2.contains(&position.0.to_owned()) {
+                    affects_path = true;
+
+                    break;
+                }
+            }
+
+            if affects_path || no_path {
+                let is_traversing = start_position.0 != current_position.0;
+
+                *default_path = DefaultPath(matrix.astar(
+                    start_position.0,
+                    end_position.0,
+                    &manhattan_heuristic,
+                ));
+
+                if is_traversing {
+                    *path = Path(default_path.0.to_owned());
+                    *traversal_index = TraversalIndex(
+                        default_path
+                            .0
+                            .to_owned()
+                            .unwrap_or_default()
+                            .iter()
+                            .position(|it| it == &current_position.0),
+                    );
+
+                    if path.0.is_none() || traversal_index.0.is_none() {
+                        *path = Path(matrix.astar(
+                            current_position.0,
+                            end_position.0,
+                            &manhattan_heuristic,
+                        ));
+                        *traversal_index = TraversalIndex(Some(0));
+                    }
+                } else if no_path {
+                    *path = Path(default_path.0.to_owned());
                     *traversal_index = TraversalIndex(Some(0));
                 }
-            } else if traversal_index.0.is_none() || path.0.is_none() {
-                *path = Path(default_path.0.to_owned());
-                *traversal_index = TraversalIndex(Some(0));
             }
         }
     }
@@ -185,10 +209,8 @@ fn increment_path_traversal(
                     || match animation_sequence.snap {
                         Some(snap) => {
                             let delta = time.time_since_startup() - snap;
-                            let delta_factor = delta.as_millis() as f32
-                                / animation_sequence.duration.as_millis() as f32;
 
-                            delta_factor >= 1.
+                            delta.as_millis() >= animation_sequence.duration.as_millis()
                         }
                         None => true,
                     };
