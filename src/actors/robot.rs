@@ -179,22 +179,24 @@ fn increment_path_traversal(
     mut query: Query<
         (
             &mut Path,
+            &mut DefaultPath,
             &mut TraversalIndex,
             &mut AnimationSequence,
             &mut Position,
-            &StartPosition,
-            &DefaultPath,
+            &mut StartPosition,
+            &mut EndPosition,
         ),
         Or<(Changed<TraversalIndex>, Changed<Path>)>,
     >,
 ) {
     for (
         mut path,
+        mut default_path,
         mut traversal_index,
         mut animation_sequence,
         mut current_position,
-        start_position,
-        default_path,
+        mut start_position,
+        mut end_position,
     ) in &mut query
     {
         if let (Some(p), Some(index)) = (&path.0, traversal_index.0) {
@@ -208,9 +210,8 @@ fn increment_path_traversal(
                 let at_end = did_pos_change
                     || match animation_sequence.snap {
                         Some(snap) => {
-                            let delta = time.time_since_startup() - snap;
-
-                            delta.as_millis() >= animation_sequence.duration.as_millis()
+                            (time.time_since_startup() - snap).as_millis()
+                                >= animation_sequence.duration.as_millis()
                         }
                         None => true,
                     };
@@ -222,8 +223,17 @@ fn increment_path_traversal(
                     };
                 }
             } else {
+                let tmp = start_position.0;
+                let inverted_default_path = match default_path.0.to_owned() {
+                    Some(path) => Some(path.into_iter().rev().collect::<Vec<_>>()),
+                    _ => None,
+                };
+
+                *start_position = StartPosition(end_position.0);
+                *end_position = EndPosition(tmp);
+                *path = Path(inverted_default_path.to_owned());
+                *default_path = DefaultPath(inverted_default_path.to_owned());
                 *current_position = Position(start_position.0);
-                *path = Path(default_path.0.to_owned());
                 *traversal_index = TraversalIndex(Some(0));
             }
         }
