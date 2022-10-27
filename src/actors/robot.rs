@@ -62,7 +62,11 @@ impl Plugin for RobotPlugin {
     }
 }
 
-fn setup_system(mut commands: Commands, node_size: Res<NodeSize>, robot_count: Res<RobotCount>) {
+fn setup_system(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    robot_count: Res<RobotCount>,
+) {
     let mut rng = rand::thread_rng();
 
     (0..robot_count.0).for_each(|_| {
@@ -85,10 +89,7 @@ fn setup_system(mut commands: Commands, node_size: Res<NodeSize>, robot_count: R
                 snap: None,
             })
             .insert_bundle(SpriteBundle {
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(node_size.0 .0, node_size.0 .1)),
-                    ..default()
-                },
+                texture: asset_server.load("robot.png"),
                 ..default()
             });
     });
@@ -130,7 +131,7 @@ fn calc_path(
                 let p_1 = &default_path.0.to_owned().unwrap_or_default();
                 let p_2 = &path.0.to_owned().unwrap_or_default();
 
-                if p_1.contains(&position.0.to_owned()) || p_2.contains(&position.0.to_owned()) {
+                if p_1.contains(&position.0) || p_2.contains(&position.0) {
                     affects_path = true;
 
                     break;

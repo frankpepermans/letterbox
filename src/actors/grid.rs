@@ -14,6 +14,7 @@ impl Plugin for GridPlugin {
             .add_system(node_system)
             .add_system(layout_grid_system)
             .add_system(render_grid_system.after(layout_grid_system))
+            .add_system(render_user_position_system.after(layout_grid_system))
             .add_system(update_user_position_coordinates_system)
             .add_system(update_user_position_cursor_pressed_system)
             .add_system(
@@ -26,18 +27,29 @@ impl Plugin for GridPlugin {
     }
 }
 
-fn setup_system(mut commands: Commands, size: Res<GridSize>) {
+fn setup_system(mut commands: Commands, size: Res<GridSize>, node_size: Res<NodeSize>) {
     let rows = size.0 .0;
     let cols = size.0 .1;
     let mut m = Matrix::new(rows, cols, Node::open());
 
     prepare_grid(&mut m);
 
-    commands.spawn().insert(m).insert(UserPosition {
-        coordinates: None,
-        cursor_pressed_state: None,
-        target_modification: None,
-    });
+    commands
+        .spawn()
+        .insert(m)
+        .insert(UserPosition {
+            coordinates: None,
+            cursor_pressed_state: None,
+            target_modification: None,
+        })
+        .insert_bundle(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(0.2, 1.0, 0.2, 0.75),
+                custom_size: Some(Vec2::new(node_size.0 .0, node_size.0 .1)),
+                ..default()
+            },
+            ..default()
+        });
 }
 
 fn node_system(
@@ -81,22 +93,31 @@ fn layout_grid_system(
     }
 }
 
-fn render_grid_system(
-    pos_query: Query<&UserPosition>,
-    mut query: Query<(&Node, &Position, &mut Sprite)>,
+fn render_grid_system(mut query: Query<(&Node, &mut Sprite), Changed<Node>>) {
+    for (node, mut sprite) in &mut query {
+        sprite.color = match node[Entry::LEFT] {
+            true => Color::rgb(249. / 255., 251. / 255., 236. / 255.),
+            false => Color::rgb(0.5, 0.5, 0.5),
+        };
+    }
+}
+
+fn render_user_position_system(
+    window: Res<WindowDescriptor>,
+    node_size: Res<NodeSize>,
+    mut pos_query: Query<(&UserPosition, &mut Transform), Changed<UserPosition>>,
+    query: Query<&Position, With<Node>>,
 ) {
-    for user_position in &pos_query {
-        for (node, position, mut sprite) in &mut query {
+    for (user_position, mut transform) in &mut pos_query {
+        for position in &query {
             if user_position.coordinates == Some(position.0) {
-                sprite.color = match node[Entry::LEFT] {
-                    true => Color::rgb(0.25, 0.5, 0.75),
-                    false => Color::rgb(0.75, 0.5, 0.25),
-                };
-            } else {
-                sprite.color = match node[Entry::LEFT] {
-                    true => Color::rgb(0.25, 0.25, 0.75),
-                    false => Color::rgb(0.75, 0.25, 0.25),
-                };
+                transform.translation.x = -window.width / 2.
+                    + position.0 .1 as f32 * node_size.0 .0
+                    + node_size.0 .0 / 2.;
+                transform.translation.y = window.height / 2.
+                    - position.0 .0 as f32 * node_size.0 .1
+                    - node_size.0 .1 / 2.;
+                transform.translation.z = 100.;
             }
         }
     }
