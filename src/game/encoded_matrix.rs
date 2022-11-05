@@ -63,7 +63,6 @@ impl From<EncodedMatrix> for Matrix<Node> {
                 .collect(),
             rows: encoded.rows,
             cols: encoded.cols,
-            entanglements: Vec::new(),
         }
     }
 }

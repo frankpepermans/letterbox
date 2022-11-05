@@ -9,7 +9,6 @@ pub struct Matrix<T> {
     pub vec: Vec<T>,
     pub rows: usize,
     pub cols: usize,
-    pub entanglements: Vec<(Coordinates, Coordinates)>,
 }
 
 impl<T> Matrix<T>
@@ -20,16 +19,7 @@ where
         let len = rows * cols;
         let vec = vec![default_value; len];
 
-        Self {
-            vec,
-            rows,
-            cols,
-            entanglements: Vec::new(),
-        }
-    }
-
-    pub fn entangle(&mut self, left: Coordinates, right: Coordinates) {
-        self.entanglements.push((left, right));
+        Self { vec, rows, cols }
     }
 
     pub fn contains(&self, coordinates: Coordinates) -> bool {

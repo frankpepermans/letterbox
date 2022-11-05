@@ -20,7 +20,7 @@ fn main() {
         })
         .insert_resource(GridSize(GRID_SIZE))
         .insert_resource(NodeSize(NODE_SIZE))
-        .insert_resource(RobotCount(100))
+        .insert_resource(RobotCount(400))
         .add_startup_system(setup_system)
         .add_plugins(DefaultPlugins)
         .add_plugin(GridPlugin)

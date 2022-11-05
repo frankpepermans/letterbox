@@ -33,7 +33,6 @@ impl AStar for Matrix<Node> {
         let mut open = BinaryHeap::from([PathNode::initial(start, goal, heuristic)]);
         let mut closed = HashMap::new();
         let mut lookup = HashMap::from([(start, 0)]);
-        let targets = Vec::from_iter(self.entanglements.iter().map(|e| vec![e.0, e.1]).flatten());
 
         while let Some(current) = open.pop() {
             if current.index == goal {
@@ -52,13 +51,7 @@ impl AStar for Matrix<Node> {
                         let g = g_score_self + g_score_n;
 
                         if visited.is_none() || g < g_score_n {
-                            // detect closest entanglement index which is not yet visited, or goal
-                            let target = targets
-                                .iter()
-                                .filter(|t| !lookup.contains_key(*t))
-                                .min_by(|a, b| heuristic(&index, *a).cmp(&heuristic(&index, *b)));
-
-                            let h = heuristic(&index, target.unwrap_or(&goal));
+                            let h = heuristic(&index, &goal);
                             let path_node = PathNode {
                                 index,
                                 parent: Some(current.index),

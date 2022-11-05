@@ -13,19 +13,12 @@ pub trait Movement {
 impl Movement for Matrix<Node> {
     #[inline(always)]
     fn nearest_neighbours(&self, index: Coordinates) -> Vec<Option<Coordinates>> {
-        let mut v = self
-            .entanglements
-            .iter()
-            .filter(|e| e.0 == index || e.1 == index)
-            .map(|e| if index == e.0 { Some(e.1) } else { Some(e.0) })
-            .collect::<Vec<Option<(usize, usize)>>>();
-
-        v.push(self.left(index));
-        v.push(self.up(index));
-        v.push(self.right(index));
-        v.push(self.down(index));
-
-        v
+        Vec::from([
+            self.left(index),
+            self.up(index),
+            self.right(index),
+            self.down(index),
+        ])
     }
 
     #[inline(always)]

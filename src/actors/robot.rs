@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{thread::spawn, time::Duration};
 
 use bevy::{prelude::*, time::FixedTimestep};
 use rand::prelude::*;
@@ -8,7 +8,7 @@ use crate::{
         astar::{manhattan_heuristic, AStar},
         node::{Entry, Node},
     },
-    game::{coordinates::Coordinates, matrix::Matrix},
+    game::{coordinates::Coordinates, matrix::Matrix, movement::Movement},
     NodeSize, Position, RobotCount,
 };
 
@@ -161,7 +161,7 @@ fn calc_path(
     mut query: Query<
         (
             &StartPosition,
-            &Position,
+            &mut Position,
             &EndPosition,
             &mut Path,
             &mut DefaultPath,
@@ -176,7 +176,7 @@ fn calc_path(
 
         for (
             start_position,
-            current_position,
+            mut current_position,
             end_position,
             mut path,
             mut default_path,
@@ -199,7 +199,11 @@ fn calc_path(
                 *default_path = DefaultPath(if existing_paths.len() > 0 {
                     Some(existing_paths[0].path.to_owned())
                 } else {
-                    let d_p = matrix.astar(start_position.0, end_position.0, &manhattan_heuristic);
+                    let m = matrix.clone();
+                    let a = start_position.0.clone();
+                    let b = end_position.0.clone();
+                    let computation = spawn(move || m.astar(a, b, &manhattan_heuristic));
+                    let d_p = computation.join().unwrap_or_default();
 
                     if let Some(d_p) = &d_p {
                         paths.push(Paths {
@@ -224,12 +228,32 @@ fn calc_path(
                     );
 
                     if path.0.is_none() || traversal_index.0.is_none() {
-                        *path = Path(matrix.astar(
-                            current_position.0,
-                            end_position.0,
-                            &manhattan_heuristic,
-                        ));
-                        *traversal_index = TraversalIndex(Some(0));
+                        let m = matrix.clone();
+                        let a = current_position.0.clone();
+                        let b = end_position.0.clone();
+
+                        if let Some(d_p) = &path.0 {
+                            let valid_nn_pos = matrix
+                                .nearest_neighbours(current_position.0)
+                                .iter()
+                                .position(|it| {
+                                    if let Some(it) = it {
+                                        d_p.contains(it)
+                                    } else {
+                                        false
+                                    }
+                                });
+
+                            *traversal_index = TraversalIndex(valid_nn_pos);
+                            *current_position = Position(d_p[valid_nn_pos.unwrap_or(0)]);
+                        }
+
+                        if path.0.is_none() || traversal_index.0.is_none() {
+                            let computation = spawn(move || m.astar(a, b, &manhattan_heuristic));
+
+                            *path = Path(computation.join().unwrap_or_default());
+                            *traversal_index = TraversalIndex(Some(0));
+                        }
                     }
                 } else if no_path {
                     *path = Path(default_path.0.to_owned());
