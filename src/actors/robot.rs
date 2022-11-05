@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bevy::prelude::*;
+use bevy::{prelude::*, time::FixedTimestep};
 use rand::prelude::*;
 
 use crate::{
@@ -12,10 +12,10 @@ use crate::{
     NodeSize, Position, RobotCount,
 };
 
-#[derive(Component)]
+#[derive(Component, Clone, Copy)]
 struct StartPosition(Coordinates);
 
-#[derive(Component)]
+#[derive(Component, Clone, Copy)]
 struct EndPosition(Coordinates);
 
 #[derive(Component)]
@@ -42,9 +42,18 @@ struct PathBundle {
 }
 
 #[derive(Component)]
-pub struct AnimationSequence {
-    pub snap: Option<Duration>,
-    pub duration: Duration,
+struct AnimationSequence {
+    snap: Option<Duration>,
+    duration: Duration,
+}
+
+#[derive(Component)]
+struct CheckPath(bool);
+
+struct Paths {
+    start_position: StartPosition,
+    end_position: EndPosition,
+    path: Vec<Coordinates>,
 }
 
 pub struct RobotPlugin;
@@ -52,8 +61,13 @@ pub struct RobotPlugin;
 impl Plugin for RobotPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_system)
-            .add_system(calc_path)
-            .add_system(traverse_path.after(calc_path))
+            .add_system(check_path)
+            .add_system_set(
+                SystemSet::new()
+                    .with_run_criteria(FixedTimestep::step(1. / 10.))
+                    .with_system(calc_path),
+            )
+            .add_system(traverse_path)
             .add_system(increment_path_traversal.after(traverse_path));
     }
 
@@ -84,6 +98,7 @@ fn setup_system(
                 default_path: DefaultPath(None),
                 traversal_index: TraversalIndex(None),
             })
+            .insert(CheckPath(true))
             .insert(AnimationSequence {
                 duration: Duration::from_millis(25 + (rng.gen::<f32>() * 200.) as u64),
                 snap: None,
@@ -95,9 +110,54 @@ fn setup_system(
     });
 }
 
-fn calc_path(
-    m_query: Query<&Matrix<Node>, Changed<Matrix<Node>>>,
+fn check_path(
     n_query: Query<(&Position, &Node), Changed<Node>>,
+    mut query: Query<
+        (&Path, &DefaultPath, &TraversalIndex, &mut CheckPath),
+        With<AnimationSequence>,
+    >,
+) {
+    for (path, default_path, traversal_index, mut check_path) in &mut query {
+        let mut affects_path = false;
+        let no_path = path.0.is_none() || traversal_index.0.is_none();
+
+        for (position, node) in &n_query {
+            if node[Entry::LEFT] {
+                affects_path = true;
+
+                break;
+            }
+
+            let x = if let Some(path) = &path.0 {
+                path.contains(&position.0)
+            } else {
+                false
+            };
+            let y = if !x {
+                if let Some(path) = &default_path.0 {
+                    path.contains(&position.0)
+                } else {
+                    false
+                }
+            } else {
+                true
+            };
+
+            if x || y {
+                affects_path = true;
+
+                break;
+            }
+        }
+
+        if affects_path || (no_path && !check_path.0) {
+            *check_path = CheckPath(true);
+        }
+    }
+}
+
+fn calc_path(
+    m_query: Query<&Matrix<Node>>,
     mut query: Query<
         (
             &StartPosition,
@@ -106,11 +166,14 @@ fn calc_path(
             &mut Path,
             &mut DefaultPath,
             &mut TraversalIndex,
+            &mut CheckPath,
         ),
-        With<AnimationSequence>,
+        Changed<CheckPath>,
     >,
 ) {
     for matrix in &m_query {
+        let mut paths = Vec::new();
+
         for (
             start_position,
             current_position,
@@ -118,34 +181,36 @@ fn calc_path(
             mut path,
             mut default_path,
             mut traversal_index,
+            mut check_path,
         ) in &mut query
         {
-            let mut affects_path = false;
-            let no_path = path.0.is_none() || traversal_index.0.is_none();
-
-            for (position, node) in &n_query {
-                if node[Entry::LEFT] {
-                    break;
-                }
-
-                let p_1 = &default_path.0.to_owned().unwrap_or_default();
-                let p_2 = &path.0.to_owned().unwrap_or_default();
-
-                if p_1.contains(&position.0) || p_2.contains(&position.0) {
-                    affects_path = true;
-
-                    break;
-                }
-            }
-
-            if affects_path || no_path {
+            if check_path.0 {
                 let is_traversing = start_position.0 != current_position.0;
+                let no_path = path.0.is_none() || traversal_index.0.is_none();
 
-                *default_path = DefaultPath(matrix.astar(
-                    start_position.0,
-                    end_position.0,
-                    &manhattan_heuristic,
-                ));
+                let existing_paths = paths
+                    .iter()
+                    .filter(|it: &&Paths| {
+                        it.start_position.0 == start_position.0
+                            && it.end_position.0 == end_position.0
+                    })
+                    .collect::<Vec<_>>();
+
+                *default_path = DefaultPath(if existing_paths.len() > 0 {
+                    Some(existing_paths[0].path.to_owned())
+                } else {
+                    let d_p = matrix.astar(start_position.0, end_position.0, &manhattan_heuristic);
+
+                    if let Some(d_p) = &d_p {
+                        paths.push(Paths {
+                            start_position: *start_position,
+                            end_position: *end_position,
+                            path: d_p.to_owned(),
+                        });
+                    }
+
+                    d_p.to_owned()
+                });
 
                 if is_traversing {
                     *path = Path(default_path.0.to_owned());
@@ -169,6 +234,10 @@ fn calc_path(
                 } else if no_path {
                     *path = Path(default_path.0.to_owned());
                     *traversal_index = TraversalIndex(Some(0));
+                }
+
+                if !(path.0.is_none() || traversal_index.0.is_none()) {
+                    *check_path = CheckPath(false);
                 }
             }
         }
