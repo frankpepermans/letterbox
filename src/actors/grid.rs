@@ -44,7 +44,7 @@ fn setup_system(mut commands: Commands, size: Res<GridSize>, node_size: Res<Node
         })
         .insert_bundle(SpriteBundle {
             sprite: Sprite {
-                color: Color::rgba(0.2, 1.0, 0.2, 0.75),
+                color: Color::rgba(0.2, 1.0, 0.2, 0.5),
                 custom_size: Some(Vec2::new(node_size.0 .0, node_size.0 .1)),
                 ..default()
             },
