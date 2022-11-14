@@ -1,4 +1,4 @@
-use std::{thread::spawn, time::Duration};
+use std::{collections::HashMap, time::Duration};
 
 use bevy::{prelude::*, time::FixedTimestep};
 use rand::prelude::*;
@@ -143,18 +143,24 @@ fn calc_path(
     >,
 ) {
     for matrix in &m_query {
-        let mut partial_path = None;
+        let mut partial_paths = HashMap::new();
 
         for (current_position, end_position, mut path, mut traversal_index, mut check_path) in
             &mut query
         {
             if check_path.0 {
-                let m = matrix.clone();
-                let a = current_position.0.clone();
-                let b = end_position.0.clone();
-                let c = partial_path.clone();
-                let computation = spawn(move || m.astar(a, b, &manhattan_heuristic, c));
-                let d_p = computation.join().unwrap_or_default();
+                let d_p = matrix.astar(
+                    current_position.0,
+                    end_position.0,
+                    &manhattan_heuristic,
+                    &partial_paths,
+                );
+
+                if let Some(d_p) = &d_p {
+                    d_p.iter().enumerate().for_each(|tuple| {
+                        partial_paths.insert(*tuple.1, d_p[tuple.0..].to_vec());
+                    });
+                }
 
                 *path = Path(d_p.to_owned());
 
@@ -164,8 +170,6 @@ fn calc_path(
                     }
 
                     *check_path = CheckPath(false);
-
-                    partial_path = d_p.to_owned();
                 } else if traversal_index.0 != None {
                     *traversal_index = TraversalIndex(None);
                 }
