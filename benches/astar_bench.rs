@@ -11,7 +11,7 @@ fn astar(s: usize) -> Option<Vec<(usize, usize)>> {
     m[(1, 9)][Entry::LEFT] = false;
     m[(1, 9)][Entry::TOP] = false;
 
-    m.astar((0, 0), (s - 1, s - 1), &manhattan_heuristic)
+    m.astar((0, 0), (s - 1, s - 1), &manhattan_heuristic, None)
 }
 
 fn criterion_benchmark(c: &mut Criterion) {

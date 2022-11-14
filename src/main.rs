@@ -15,7 +15,7 @@ fn main() {
     App::new()
         .insert_resource(GridSize(GRID_SIZE))
         .insert_resource(NodeSize(NODE_SIZE))
-        .insert_resource(RobotCount(400))
+        .insert_resource(RobotCount(500))
         .add_startup_system(setup_system)
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             window: WindowDescriptor {

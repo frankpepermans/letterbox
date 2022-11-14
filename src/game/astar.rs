@@ -13,6 +13,7 @@ pub trait AStar {
         start: Coordinates,
         goal: Coordinates,
         heuristic: &dyn Fn(&Coordinates, &Coordinates) -> i32,
+        partial_path: Option<Vec<(usize, usize)>>,
     ) -> Option<Vec<Coordinates>>;
 }
 
@@ -29,6 +30,7 @@ impl AStar for Matrix<Node> {
         start: Coordinates,
         goal: Coordinates,
         heuristic: &dyn Fn(&Coordinates, &Coordinates) -> i32,
+        partial_path: Option<Vec<(usize, usize)>>,
     ) -> Option<Vec<Coordinates>> {
         let mut open = BinaryHeap::from([PathNode::initial(start, goal, heuristic)]);
         let mut closed = HashMap::new();
@@ -37,6 +39,10 @@ impl AStar for Matrix<Node> {
         while let Some(current) = open.pop() {
             if current.index == goal {
                 return Some(to_path(current, closed));
+            } else if let Some(path) = &partial_path {
+                if let Some(pos) = path.iter().position(|it| it == &current.index) {
+                    return Some([to_path(current, closed), path[pos + 1..].to_vec()].concat());
+                }
             }
 
             closed.insert(current.index, current);
