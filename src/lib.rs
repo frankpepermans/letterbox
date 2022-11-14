@@ -12,14 +12,20 @@ pub enum UserCursorPressedState {
     DOWN,
 }
 
+#[derive(Resource)]
 pub struct GridSize(pub (usize, usize));
 
+#[derive(Resource)]
 pub struct NodeSize(pub (f32, f32));
 
 #[derive(Component, Debug)]
 pub struct Position(pub Coordinates);
 
+#[derive(Resource)]
 pub struct RobotCount(pub i16);
+
+#[derive(Component, Debug)]
+struct Player {}
 
 #[derive(Component)]
 pub struct UserPosition {

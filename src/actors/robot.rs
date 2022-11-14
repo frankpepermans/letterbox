@@ -9,7 +9,7 @@ use crate::{
         node::{Entry, Node},
     },
     game::{coordinates::Coordinates, matrix::Matrix, movement::Movement},
-    NodeSize, Position, RobotCount,
+    NodeSize, Player, Position, RobotCount,
 };
 
 #[derive(Component, Clone, Copy)]
@@ -62,6 +62,7 @@ impl Plugin for RobotPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_system)
             .add_system(check_path)
+            .add_system(track_player_system)
             .add_system_set(
                 SystemSet::new()
                     .with_run_criteria(FixedTimestep::step(1. / 10.))
@@ -87,13 +88,12 @@ fn setup_system(
         let index = (rng.gen::<f32>() * 24.) as usize;
 
         commands
-            .spawn()
-            .insert_bundle(PathInstructionsBundle {
+            .spawn(PathInstructionsBundle {
                 start_position: StartPosition((index, 0)),
                 end_position: EndPosition((index, 49)),
                 current_position: Position((index, 0)),
             })
-            .insert_bundle(PathBundle {
+            .insert(PathBundle {
                 path: Path(None),
                 default_path: DefaultPath(None),
                 traversal_index: TraversalIndex(None),
@@ -103,7 +103,7 @@ fn setup_system(
                 duration: Duration::from_millis(25 + (rng.gen::<f32>() * 200.) as u64),
                 snap: None,
             })
-            .insert_bundle(SpriteBundle {
+            .insert(SpriteBundle {
                 texture: asset_server.load("robot.png"),
                 ..default()
             });
@@ -268,6 +268,17 @@ fn calc_path(
     }
 }
 
+fn track_player_system(
+    p_query: Query<&Position, (With<Player>, Changed<Position>)>,
+    mut query: Query<&mut EndPosition>,
+) {
+    for position in &p_query {
+        for mut end_position in &mut query {
+            *end_position = EndPosition(position.0);
+        }
+    }
+}
+
 fn increment_path_traversal(
     time: Res<Time>,
     mut query: Query<
@@ -304,7 +315,7 @@ fn increment_path_traversal(
                 let at_end = did_pos_change
                     || match animation_sequence.snap {
                         Some(snap) => {
-                            (time.time_since_startup() - snap).as_millis()
+                            (time.elapsed() - snap).as_millis()
                                 >= animation_sequence.duration.as_millis()
                         }
                         None => true,
@@ -313,7 +324,7 @@ fn increment_path_traversal(
                 if at_end {
                     *animation_sequence = AnimationSequence {
                         duration: animation_sequence.duration,
-                        snap: Some(time.time_since_startup()),
+                        snap: Some(time.elapsed()),
                     };
                 }
             } else {
@@ -336,7 +347,7 @@ fn increment_path_traversal(
 
 fn traverse_path(
     time: Res<Time>,
-    window: Res<WindowDescriptor>,
+    windows: Res<Windows>,
     node_size: Res<NodeSize>,
     mut query: Query<(
         &Path,
@@ -345,12 +356,14 @@ fn traverse_path(
         &mut TraversalIndex,
     )>,
 ) {
+    let window = windows.primary();
+
     for (path, animation_sequence, mut transform, mut traversal_index) in &mut query {
         let params = (&path.0, traversal_index.0, animation_sequence.snap);
 
         if let (Some(path), Some(index), Some(start_duration)) = params {
             if index < path.len() - 1 {
-                let delta = time.time_since_startup() - start_duration;
+                let delta = time.elapsed() - start_duration;
                 let mut delta_factor =
                     delta.as_millis() as f32 / animation_sequence.duration.as_millis() as f32;
                 let at_end = delta_factor > 1.;
@@ -367,7 +380,7 @@ fn traverse_path(
                     row_0 + (row_1 - row_0) * delta_factor,
                     col_0 + (col_1 - col_0) * delta_factor,
                 );
-                let (w, h) = (window.width, window.height);
+                let (w, h) = (window.width(), window.height());
 
                 transform.translation.x =
                     -w / 2. + position.1 as f32 * node_size.0 .0 + node_size.0 .0 / 2.;

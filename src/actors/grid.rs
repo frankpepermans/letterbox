@@ -35,14 +35,13 @@ fn setup_system(mut commands: Commands, size: Res<GridSize>, node_size: Res<Node
     prepare_grid(&mut m);
 
     commands
-        .spawn()
-        .insert(m)
+        .spawn(m)
         .insert(UserPosition {
             coordinates: None,
             cursor_pressed_state: None,
             target_modification: None,
         })
-        .insert_bundle(SpriteBundle {
+        .insert(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(0.2, 1.0, 0.2, 0.5),
                 custom_size: Some(Vec2::new(node_size.0 .0, node_size.0 .1)),
@@ -66,10 +65,10 @@ fn node_system(
             let col = index % cols;
 
             commands
-                .spawn()
+                .spawn_empty()
                 .insert(*node)
                 .insert(Position((row, col)))
-                .insert_bundle(SpriteBundle {
+                .insert(SpriteBundle {
                     sprite: Sprite {
                         custom_size: Some(Vec2::new(node_size.0 .0, node_size.0 .1)),
                         ..default()
@@ -81,15 +80,17 @@ fn node_system(
 }
 
 fn layout_grid_system(
-    window: Res<WindowDescriptor>,
+    windows: Res<Windows>,
     node_size: Res<NodeSize>,
     mut query: Query<(&Position, &mut Transform), Or<(Changed<Node>, Changed<Position>)>>,
 ) {
+    let window = windows.primary();
+
     for (position, mut transform) in &mut query {
         transform.translation.x =
-            -window.width / 2. + position.0 .1 as f32 * node_size.0 .0 + node_size.0 .0 / 2.;
+            -window.width() / 2. + position.0 .1 as f32 * node_size.0 .0 + node_size.0 .0 / 2.;
         transform.translation.y =
-            window.height / 2. - position.0 .0 as f32 * node_size.0 .1 - node_size.0 .1 / 2.;
+            window.height() / 2. - position.0 .0 as f32 * node_size.0 .1 - node_size.0 .1 / 2.;
     }
 }
 
@@ -103,18 +104,20 @@ fn render_grid_system(mut query: Query<(&Node, &mut Sprite), Changed<Node>>) {
 }
 
 fn render_user_position_system(
-    window: Res<WindowDescriptor>,
+    windows: Res<Windows>,
     node_size: Res<NodeSize>,
     mut pos_query: Query<(&UserPosition, &mut Transform), Changed<UserPosition>>,
     query: Query<&Position, With<Node>>,
 ) {
+    let window = windows.primary();
+
     for (user_position, mut transform) in &mut pos_query {
         for position in &query {
             if user_position.coordinates == Some(position.0) {
-                transform.translation.x = -window.width / 2.
+                transform.translation.x = -window.width() / 2.
                     + position.0 .1 as f32 * node_size.0 .0
                     + node_size.0 .0 / 2.;
-                transform.translation.y = window.height / 2.
+                transform.translation.y = window.height() / 2.
                     - position.0 .0 as f32 * node_size.0 .1
                     - node_size.0 .1 / 2.;
                 transform.translation.z = 100.;
