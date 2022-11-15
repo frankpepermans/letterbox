@@ -157,20 +157,27 @@ fn calc_path(
                 );
 
                 if let Some(d_p) = &d_p {
-                    d_p.iter().enumerate().for_each(|tuple| {
-                        partial_paths.insert(*tuple.1, d_p[tuple.0..].to_vec());
-                    });
-                }
+                    let size = d_p.len();
 
-                *path = Path(d_p.to_owned());
+                    d_p.iter()
+                        .enumerate()
+                        .filter(|tuple| tuple.0 + 1 < size)
+                        .for_each(|tuple| {
+                            partial_paths
+                                .entry(*tuple.1)
+                                .or_insert_with(|| d_p[tuple.0 + 1..].to_vec());
+                        });
 
-                if path.0.is_some() {
                     if traversal_index.0 != Some(0) {
                         *traversal_index = TraversalIndex(Some(0));
                     }
 
                     *check_path = CheckPath(false);
-                } else if traversal_index.0 != None {
+                }
+
+                *path = Path(d_p.to_owned());
+
+                if !path.0.is_some() {
                     *traversal_index = TraversalIndex(None);
                 }
             }
