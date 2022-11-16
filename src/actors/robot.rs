@@ -73,24 +73,7 @@ fn setup_system(
     (0..robot_count.0).for_each(|_| {
         let index = (rng.gen::<f32>() * 24.) as usize;
 
-        commands
-            .spawn(PathInstructionsBundle {
-                end_position: EndPosition((index, 49)),
-                current_position: Position((index, 0)),
-            })
-            .insert(PathBundle {
-                path: Path(None),
-                traversal_index: TraversalIndex(None),
-            })
-            .insert(CheckPath(true))
-            .insert(AnimationSequence {
-                duration: Duration::from_millis(25 + (rng.gen::<f32>() * 200.) as u64),
-                snap: None,
-            })
-            .insert(SpriteBundle {
-                texture: asset_server.load("robot.png"),
-                ..default()
-            });
+        spawn_robot(&mut commands, (index, 49), &asset_server);
     });
 }
 
@@ -148,9 +131,19 @@ fn calc_path(
         for (current_position, end_position, mut path, mut traversal_index, mut check_path) in
             &mut query
         {
+            let mut start_position = current_position.0;
+
+            if let Some(path) = &path.0 {
+                if let Some(index) = &traversal_index.0 {
+                    if *index < path.len() - 1 {
+                        start_position = path[index + 1];
+                    }
+                }
+            }
+
             if check_path.0 {
                 let d_p = matrix.astar(
-                    current_position.0,
+                    start_position,
                     end_position.0,
                     &manhattan_heuristic,
                     &partial_paths,
@@ -175,7 +168,13 @@ fn calc_path(
                     *check_path = CheckPath(false);
                 }
 
-                *path = Path(d_p.to_owned());
+                if start_position != current_position.0 {
+                    *path = Path(Some(
+                        [Vec::from([current_position.0]), d_p.unwrap_or_default()].concat(),
+                    ));
+                } else {
+                    *path = Path(d_p);
+                }
 
                 if !path.0.is_some() {
                     *traversal_index = TraversalIndex(None);
@@ -187,11 +186,12 @@ fn calc_path(
 
 fn track_player_system(
     p_query: Query<&Position, (With<Player>, Changed<Position>)>,
-    mut query: Query<&mut EndPosition>,
+    mut query: Query<(&mut EndPosition, &mut CheckPath)>,
 ) {
     for position in &p_query {
-        for mut end_position in &mut query {
+        for (mut end_position, mut check_path) in &mut query {
             *end_position = EndPosition(position.0);
+            *check_path = CheckPath(true);
         }
     }
 }
@@ -241,16 +241,23 @@ fn traverse_path(
     time: Res<Time>,
     windows: Res<Windows>,
     node_size: Res<NodeSize>,
+    asset_server: Res<AssetServer>,
+    mut commands: Commands,
     mut query: Query<(
+        Entity,
         &Path,
         &AnimationSequence,
         &mut Transform,
         &mut TraversalIndex,
+        &mut Visibility,
     )>,
+    p_query: Query<&Position, With<Player>>,
 ) {
     let window = windows.primary();
 
-    for (path, animation_sequence, mut transform, mut traversal_index) in &mut query {
+    for (entity, path, animation_sequence, mut transform, mut traversal_index, mut visibility) in
+        &mut query
+    {
         let params = (&path.0, traversal_index.0, animation_sequence.snap);
 
         if let (Some(path), Some(index), Some(start_duration)) = params {
@@ -280,10 +287,47 @@ fn traverse_path(
                     h / 2. - position.0 as f32 * node_size.0 .1 - node_size.0 .1 / 2.;
                 transform.translation.z = 100.;
 
+                *visibility = Visibility::VISIBLE;
+
                 if at_end {
                     *traversal_index = TraversalIndex(Some(index + 1));
+                }
+            } else {
+                commands.entity(entity).despawn();
+
+                for position in &p_query {
+                    spawn_robot(&mut commands, position.0, &asset_server);
                 }
             }
         }
     }
+}
+
+fn spawn_robot(
+    commands: &mut Commands,
+    end_position: Coordinates,
+    asset_server: &Res<AssetServer>,
+) {
+    let mut rng = rand::thread_rng();
+    let index = (rng.gen::<f32>() * 24.) as usize;
+
+    commands
+        .spawn(PathInstructionsBundle {
+            end_position: EndPosition(end_position),
+            current_position: Position((index, 0)),
+        })
+        .insert(PathBundle {
+            path: Path(None),
+            traversal_index: TraversalIndex(None),
+        })
+        .insert(CheckPath(true))
+        .insert(AnimationSequence {
+            duration: Duration::from_millis(25 + (rng.gen::<f32>() * 2000.) as u64),
+            snap: None,
+        })
+        .insert(SpriteBundle {
+            texture: asset_server.load("robot.png"),
+            visibility: Visibility::INVISIBLE,
+            ..default()
+        });
 }
