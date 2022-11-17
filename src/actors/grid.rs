@@ -6,15 +6,11 @@ use crate::{
     GridSize, NodeSize, Position, UserCursorPressedState, UserPosition,
 };
 
-#[derive(Component)]
-struct RedrawTrigger(bool);
-
 pub struct GridPlugin;
 
 impl Plugin for GridPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_system)
-            .add_system(node_system)
             .add_system(layout_grid_system)
             .add_system(render_grid_system.after(layout_grid_system))
             .add_system(render_user_position_system.after(layout_grid_system))
@@ -37,15 +33,12 @@ fn setup_system(mut commands: Commands, size: Res<GridSize>, node_size: Res<Node
 
     prepare_grid(&mut m);
 
-    commands.insert_resource(m);
-
     commands
         .spawn(UserPosition {
             coordinates: None,
             cursor_pressed_state: None,
             target_modification: None,
         })
-        .insert(RedrawTrigger(true))
         .insert(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(0.2, 1.0, 0.2, 0.5),
@@ -54,35 +47,27 @@ fn setup_system(mut commands: Commands, size: Res<GridSize>, node_size: Res<Node
             },
             ..default()
         });
-}
 
-fn node_system(
-    mut commands: Commands,
-    size: Res<GridSize>,
-    node_size: Res<NodeSize>,
-    matrix: Res<Matrix<Node>>,
-    query: Query<&RedrawTrigger, Changed<RedrawTrigger>>,
-) {
-    for _ in &query {
-        let cols = size.0 .1;
+    let cols = size.0 .1;
 
-        matrix.vec.iter().enumerate().for_each(|(index, node)| {
-            let row = index / cols;
-            let col = index % cols;
+    m.vec.iter().enumerate().for_each(|(index, node)| {
+        let row = index / cols;
+        let col = index % cols;
 
-            commands
-                .spawn_empty()
-                .insert(*node)
-                .insert(Position((row, col)))
-                .insert(SpriteBundle {
-                    sprite: Sprite {
-                        custom_size: Some(Vec2::new(node_size.0 .0, node_size.0 .1)),
-                        ..default()
-                    },
+        commands
+            .spawn_empty()
+            .insert(*node)
+            .insert(Position((row, col)))
+            .insert(SpriteBundle {
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(node_size.0 .0, node_size.0 .1)),
                     ..default()
-                });
-        });
-    }
+                },
+                ..default()
+            });
+    });
+
+    commands.insert_resource(m);
 }
 
 fn layout_grid_system(
@@ -194,10 +179,10 @@ fn update_user_position_cursor_pressed_system(
 
 fn modify_single_node_system(
     mut lookup_query: Query<(&mut Node, &Position)>,
-    mut query: Query<(&mut UserPosition, &mut RedrawTrigger), Changed<UserPosition>>,
+    mut query: Query<&mut UserPosition, Changed<UserPosition>>,
     mut matrix: ResMut<Matrix<Node>>,
 ) {
-    for (mut user_position, mut redraw_tigger) in &mut query {
+    for mut user_position in &mut query {
         if let (Some(coordinates), Some(cursor_pressed_state)) = (
             user_position.coordinates,
             user_position.cursor_pressed_state,
@@ -228,8 +213,6 @@ fn modify_single_node_system(
                         target_modification: Some(target_modification),
                     };
                 }
-
-                *redraw_tigger = RedrawTrigger(true);
             }
         }
     }

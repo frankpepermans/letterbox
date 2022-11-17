@@ -9,7 +9,7 @@ use crate::{
         node::{Entry, Node},
     },
     game::{coordinates::Coordinates, matrix::Matrix},
-    AnimationSequence, NodeSize, Player, PlayerPosition, Position, RobotCount,
+    AnimationSequence, GridSize, NodeSize, Player, PlayerPosition, Position, RobotCount,
 };
 
 #[derive(Component, Clone, Copy)]
@@ -61,13 +61,14 @@ fn setup_system(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     robot_count: Res<RobotCount>,
+    grid_size: Res<GridSize>,
 ) {
     let mut rng = rand::thread_rng();
 
     (0..robot_count.0).for_each(|_| {
         let index = (rng.gen::<f32>() * 24.) as usize;
 
-        spawn_robot(&mut commands, (index, 49), &asset_server);
+        spawn_robot(&mut commands, (index, 49), &asset_server, &grid_size);
     });
 }
 
@@ -234,6 +235,7 @@ fn traverse_path(
     windows: Res<Windows>,
     node_size: Res<NodeSize>,
     asset_server: Res<AssetServer>,
+    grid_size: Res<GridSize>,
     mut commands: Commands,
     mut query: Query<(
         Entity,
@@ -289,7 +291,12 @@ fn traverse_path(
                     if path[path.len() - 1] == position.current_position.0 {
                         commands.entity(entity).despawn();
 
-                        spawn_robot(&mut commands, position.current_position.0, &asset_server);
+                        spawn_robot(
+                            &mut commands,
+                            position.current_position.0,
+                            &asset_server,
+                            &grid_size,
+                        );
                     }
                 }
             }
@@ -301,14 +308,33 @@ fn spawn_robot(
     commands: &mut Commands,
     end_position: Coordinates,
     asset_server: &Res<AssetServer>,
+    grid_size: &Res<GridSize>,
 ) {
     let mut rng = rand::thread_rng();
-    let index = (rng.gen::<f32>() * 24.) as usize;
+    let start_position = if rng.gen::<bool>() {
+        if rng.gen::<bool>() {
+            ((rng.gen::<f32>() * grid_size.0 .0 as f32) as usize, 0)
+        } else {
+            (
+                (rng.gen::<f32>() * grid_size.0 .0 as f32) as usize,
+                grid_size.0 .1 - 1,
+            )
+        }
+    } else {
+        if rng.gen::<bool>() {
+            (0, (rng.gen::<f32>() * grid_size.0 .1 as f32) as usize)
+        } else {
+            (
+                grid_size.0 .0 - 1,
+                (rng.gen::<f32>() * grid_size.0 .1 as f32) as usize,
+            )
+        }
+    };
 
     commands
         .spawn(PathInstructionsBundle {
             end_position: EndPosition(end_position),
-            current_position: Position((index, 0)),
+            current_position: Position(start_position),
         })
         .insert(PathBundle {
             path: Path(None),
@@ -316,7 +342,7 @@ fn spawn_robot(
         })
         .insert(CheckPath(true))
         .insert(AnimationSequence {
-            duration: Duration::from_millis(2500 + (rng.gen::<f32>() * 2000.) as u64),
+            duration: Duration::from_millis(50 + (rng.gen::<f32>() * 2000.) as u64),
             snap: None,
         })
         .insert(SpriteBundle {
