@@ -54,7 +54,7 @@ fn update_player_position_system(
     key_code: Res<Input<KeyCode>>,
     time: Res<Time>,
     mut query: Query<(&mut PlayerPosition, &mut AnimationSequence, &mut KeyState), With<Player>>,
-    m_query: Query<&Matrix<Node>>,
+    matrix: Res<Matrix<Node>>,
 ) {
     for (mut position, mut animation_sequence, mut key_state) in &mut query {
         if key_code.just_released(KeyCode::Left) && key_state.down_key == Some(KeyCode::Left) {
@@ -88,49 +88,47 @@ fn update_player_position_system(
             };
         }
 
-        for matrix in &m_query {
-            if position.next_position.is_none() {
-                if key_code.just_pressed(KeyCode::Left) {
-                    if let Some(next_node) = matrix.left(position.current_position.0) {
-                        *position = PlayerPosition {
-                            current_position: position.current_position,
-                            next_position: Some(Position(next_node)),
-                        };
-                    }
-                } else if key_code.just_pressed(KeyCode::Right) {
-                    if let Some(next_node) = matrix.right(position.current_position.0) {
-                        *position = PlayerPosition {
-                            current_position: position.current_position,
-                            next_position: Some(Position(next_node)),
-                        };
-                    }
-                } else if key_code.just_pressed(KeyCode::Up) {
-                    if let Some(next_node) = matrix.up(position.current_position.0) {
-                        *position = PlayerPosition {
-                            current_position: position.current_position,
-                            next_position: Some(Position(next_node)),
-                        };
-                    }
-                } else if key_code.just_pressed(KeyCode::Down) {
-                    if let Some(next_node) = matrix.down(position.current_position.0) {
-                        *position = PlayerPosition {
-                            current_position: position.current_position,
-                            next_position: Some(Position(next_node)),
-                        };
-                    }
-                }
-
-                if key_code.any_just_pressed([
-                    KeyCode::Left,
-                    KeyCode::Right,
-                    KeyCode::Up,
-                    KeyCode::Down,
-                ]) {
-                    *animation_sequence = AnimationSequence {
-                        duration: animation_sequence.duration,
-                        snap: Some(time.elapsed()),
+        if position.next_position.is_none() {
+            if key_code.just_pressed(KeyCode::Left) {
+                if let Some(next_node) = matrix.left(position.current_position.0) {
+                    *position = PlayerPosition {
+                        current_position: position.current_position,
+                        next_position: Some(Position(next_node)),
                     };
                 }
+            } else if key_code.just_pressed(KeyCode::Right) {
+                if let Some(next_node) = matrix.right(position.current_position.0) {
+                    *position = PlayerPosition {
+                        current_position: position.current_position,
+                        next_position: Some(Position(next_node)),
+                    };
+                }
+            } else if key_code.just_pressed(KeyCode::Up) {
+                if let Some(next_node) = matrix.up(position.current_position.0) {
+                    *position = PlayerPosition {
+                        current_position: position.current_position,
+                        next_position: Some(Position(next_node)),
+                    };
+                }
+            } else if key_code.just_pressed(KeyCode::Down) {
+                if let Some(next_node) = matrix.down(position.current_position.0) {
+                    *position = PlayerPosition {
+                        current_position: position.current_position,
+                        next_position: Some(Position(next_node)),
+                    };
+                }
+            }
+
+            if key_code.any_just_pressed([
+                KeyCode::Left,
+                KeyCode::Right,
+                KeyCode::Up,
+                KeyCode::Down,
+            ]) {
+                *animation_sequence = AnimationSequence {
+                    duration: animation_sequence.duration,
+                    snap: Some(time.elapsed()),
+                };
             }
         }
     }
@@ -150,7 +148,7 @@ fn traverse_path(
         ),
         With<Player>,
     >,
-    m_query: Query<&Matrix<Node>>,
+    matrix: Res<Matrix<Node>>,
 ) {
     let window = windows.primary();
 
@@ -187,56 +185,66 @@ fn traverse_path(
 
             if at_end {
                 if let Some(down_key) = key_state.down_key {
-                    for matrix in &m_query {
-                        match down_key {
-                            KeyCode::Left => {
-                                if let Some(next_node) =
-                                    matrix.left(player_position.current_position.0)
-                                {
-                                    *player_position = PlayerPosition {
-                                        current_position: next_position,
-                                        next_position: Some(Position(next_node)),
-                                    };
-                                }
+                    match down_key {
+                        KeyCode::Left => {
+                            if let Some(next_node) = matrix.left(next_position.0) {
+                                *player_position = PlayerPosition {
+                                    current_position: next_position,
+                                    next_position: Some(Position(next_node)),
+                                };
+                            } else {
+                                *player_position = PlayerPosition {
+                                    current_position: next_position,
+                                    next_position: None,
+                                };
                             }
-                            KeyCode::Right => {
-                                if let Some(next_node) =
-                                    matrix.right(player_position.current_position.0)
-                                {
-                                    *player_position = PlayerPosition {
-                                        current_position: next_position,
-                                        next_position: Some(Position(next_node)),
-                                    };
-                                }
-                            }
-                            KeyCode::Up => {
-                                if let Some(next_node) =
-                                    matrix.up(player_position.current_position.0)
-                                {
-                                    *player_position = PlayerPosition {
-                                        current_position: next_position,
-                                        next_position: Some(Position(next_node)),
-                                    };
-                                }
-                            }
-                            KeyCode::Down => {
-                                if let Some(next_node) =
-                                    matrix.down(player_position.current_position.0)
-                                {
-                                    *player_position = PlayerPosition {
-                                        current_position: next_position,
-                                        next_position: Some(Position(next_node)),
-                                    };
-                                }
-                            }
-                            _ => {}
                         }
-
-                        *animation_sequence = AnimationSequence {
-                            duration: animation_sequence.duration,
-                            snap: Some(time.elapsed()),
-                        };
+                        KeyCode::Right => {
+                            if let Some(next_node) = matrix.right(next_position.0) {
+                                *player_position = PlayerPosition {
+                                    current_position: next_position,
+                                    next_position: Some(Position(next_node)),
+                                };
+                            } else {
+                                *player_position = PlayerPosition {
+                                    current_position: next_position,
+                                    next_position: None,
+                                };
+                            }
+                        }
+                        KeyCode::Up => {
+                            if let Some(next_node) = matrix.up(next_position.0) {
+                                *player_position = PlayerPosition {
+                                    current_position: next_position,
+                                    next_position: Some(Position(next_node)),
+                                };
+                            } else {
+                                *player_position = PlayerPosition {
+                                    current_position: next_position,
+                                    next_position: None,
+                                };
+                            }
+                        }
+                        KeyCode::Down => {
+                            if let Some(next_node) = matrix.down(next_position.0) {
+                                *player_position = PlayerPosition {
+                                    current_position: next_position,
+                                    next_position: Some(Position(next_node)),
+                                };
+                            } else {
+                                *player_position = PlayerPosition {
+                                    current_position: next_position,
+                                    next_position: None,
+                                };
+                            }
+                        }
+                        _ => {}
                     }
+
+                    *animation_sequence = AnimationSequence {
+                        duration: animation_sequence.duration,
+                        snap: Some(time.elapsed()),
+                    };
                 } else {
                     *player_position = PlayerPosition {
                         current_position: next_position,

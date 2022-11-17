@@ -6,6 +6,9 @@ use crate::{
     GridSize, NodeSize, Position, UserCursorPressedState, UserPosition,
 };
 
+#[derive(Component)]
+struct RedrawTrigger(bool);
+
 pub struct GridPlugin;
 
 impl Plugin for GridPlugin {
@@ -34,13 +37,15 @@ fn setup_system(mut commands: Commands, size: Res<GridSize>, node_size: Res<Node
 
     prepare_grid(&mut m);
 
+    commands.insert_resource(m);
+
     commands
-        .spawn(m)
-        .insert(UserPosition {
+        .spawn(UserPosition {
             coordinates: None,
             cursor_pressed_state: None,
             target_modification: None,
         })
+        .insert(RedrawTrigger(true))
         .insert(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(0.2, 1.0, 0.2, 0.5),
@@ -55,9 +60,10 @@ fn node_system(
     mut commands: Commands,
     size: Res<GridSize>,
     node_size: Res<NodeSize>,
-    query: Query<&Matrix<Node>, Added<Matrix<Node>>>,
+    matrix: Res<Matrix<Node>>,
+    query: Query<&RedrawTrigger, Changed<RedrawTrigger>>,
 ) {
-    for matrix in &query {
+    for _ in &query {
         let cols = size.0 .1;
 
         matrix.vec.iter().enumerate().for_each(|(index, node)| {
@@ -129,7 +135,8 @@ fn render_user_position_system(
 fn update_user_position_coordinates_system(
     windows: Res<Windows>,
     node_size: Res<NodeSize>,
-    mut query: Query<(&mut Matrix<Node>, &mut UserPosition)>,
+    matrix: Res<Matrix<Node>>,
+    mut query: Query<&mut UserPosition>,
 ) {
     if let Some(window) = windows.get_primary() {
         let h = window.height();
@@ -139,7 +146,7 @@ fn update_user_position_coordinates_system(
             let col = pos[0] / node_size.0 .1;
             let coordinates = (row.floor() as usize, col.floor() as usize);
 
-            for (matrix, mut user_position) in &mut query {
+            for mut user_position in &mut query {
                 let mut val = user_position.coordinates;
 
                 if matrix.contains(coordinates) {
@@ -187,9 +194,10 @@ fn update_user_position_cursor_pressed_system(
 
 fn modify_single_node_system(
     mut lookup_query: Query<(&mut Node, &Position)>,
-    mut query: Query<(&mut Matrix<Node>, &mut UserPosition), Changed<UserPosition>>,
+    mut query: Query<(&mut UserPosition, &mut RedrawTrigger), Changed<UserPosition>>,
+    mut matrix: ResMut<Matrix<Node>>,
 ) {
-    for (mut matrix, mut user_position) in &mut query {
+    for (mut user_position, mut redraw_tigger) in &mut query {
         if let (Some(coordinates), Some(cursor_pressed_state)) = (
             user_position.coordinates,
             user_position.cursor_pressed_state,
@@ -220,6 +228,8 @@ fn modify_single_node_system(
                         target_modification: Some(target_modification),
                     };
                 }
+
+                *redraw_tigger = RedrawTrigger(true);
             }
         }
     }

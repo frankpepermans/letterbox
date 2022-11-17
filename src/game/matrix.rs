@@ -1,10 +1,10 @@
 use std::ops::{Index, IndexMut};
 
-use bevy::prelude::Component;
+use bevy::prelude::Resource;
 
 use super::coordinates::{Coordinates, CreateCoordinates};
 
-#[derive(Component, Debug, Clone)]
+#[derive(Resource, Debug, Clone)]
 pub struct Matrix<T> {
     pub vec: Vec<T>,
     pub rows: usize,
