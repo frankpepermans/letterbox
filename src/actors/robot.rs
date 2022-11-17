@@ -9,7 +9,7 @@ use crate::{
         node::{Entry, Node},
     },
     game::{coordinates::Coordinates, matrix::Matrix},
-    NodeSize, Player, Position, RobotCount,
+    AnimationSequence, NodeSize, Player, PlayerPosition, Position, RobotCount,
 };
 
 #[derive(Component, Clone, Copy)]
@@ -31,12 +31,6 @@ struct PathInstructionsBundle {
 struct PathBundle {
     path: Path,
     traversal_index: TraversalIndex,
-}
-
-#[derive(Component)]
-struct AnimationSequence {
-    snap: Option<Duration>,
-    duration: Duration,
 }
 
 #[derive(Component)]
@@ -131,15 +125,15 @@ fn calc_path(
         for (current_position, end_position, mut path, mut traversal_index, mut check_path) in
             &mut query
         {
-            let mut start_position = current_position.0;
-
-            if let Some(path) = &path.0 {
-                if let Some(index) = &traversal_index.0 {
-                    if *index < path.len() - 1 {
-                        start_position = path[index + 1];
-                    }
+            let start_position = if let (Some(path), Some(index)) = (&path.0, &traversal_index.0) {
+                if *index < path.len() - 1 {
+                    path[index + 1]
+                } else {
+                    current_position.0
                 }
-            }
+            } else {
+                current_position.0
+            };
 
             if check_path.0 {
                 let d_p = matrix.astar(
@@ -185,12 +179,12 @@ fn calc_path(
 }
 
 fn track_player_system(
-    p_query: Query<&Position, (With<Player>, Changed<Position>)>,
+    p_query: Query<&PlayerPosition, (With<Player>, Changed<PlayerPosition>)>,
     mut query: Query<(&mut EndPosition, &mut CheckPath)>,
 ) {
     for position in &p_query {
         for (mut end_position, mut check_path) in &mut query {
-            *end_position = EndPosition(position.0);
+            *end_position = EndPosition(position.current_position.0);
             *check_path = CheckPath(true);
         }
     }
@@ -251,7 +245,7 @@ fn traverse_path(
         &mut TraversalIndex,
         &mut Visibility,
     )>,
-    p_query: Query<&Position, With<Player>>,
+    p_query: Query<&PlayerPosition, With<Player>>,
 ) {
     let window = windows.primary();
 
@@ -293,10 +287,12 @@ fn traverse_path(
                     *traversal_index = TraversalIndex(Some(index + 1));
                 }
             } else {
-                commands.entity(entity).despawn();
-
                 for position in &p_query {
-                    spawn_robot(&mut commands, position.0, &asset_server);
+                    if path[path.len() - 1] == position.current_position.0 {
+                        commands.entity(entity).despawn();
+
+                        spawn_robot(&mut commands, position.current_position.0, &asset_server);
+                    }
                 }
             }
         }
@@ -322,7 +318,7 @@ fn spawn_robot(
         })
         .insert(CheckPath(true))
         .insert(AnimationSequence {
-            duration: Duration::from_millis(25 + (rng.gen::<f32>() * 2000.) as u64),
+            duration: Duration::from_millis(2500 + (rng.gen::<f32>() * 2000.) as u64),
             snap: None,
         })
         .insert(SpriteBundle {

@@ -1,5 +1,7 @@
 #![feature(binary_heap_retain)]
 
+use std::time::Duration;
+
 use bevy::prelude::*;
 use game::{coordinates::Coordinates, node::Node};
 
@@ -18,7 +20,7 @@ pub struct GridSize(pub (usize, usize));
 #[derive(Resource)]
 pub struct NodeSize(pub (f32, f32));
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone, Copy)]
 pub struct Position(pub Coordinates);
 
 #[derive(Resource)]
@@ -32,4 +34,16 @@ pub struct UserPosition {
     pub coordinates: Option<Coordinates>,
     pub cursor_pressed_state: Option<UserCursorPressedState>,
     pub target_modification: Option<Node>,
+}
+
+#[derive(Component)]
+struct AnimationSequence {
+    snap: Option<Duration>,
+    duration: Duration,
+}
+
+#[derive(Component, Debug)]
+struct PlayerPosition {
+    current_position: Position,
+    next_position: Option<Position>,
 }
