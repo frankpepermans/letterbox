@@ -1,4 +1,8 @@
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use bevy::{prelude::*, time::FixedTimestep};
 use rand::prelude::*;
@@ -127,61 +131,63 @@ fn calc_path(
         Changed<CheckPath>,
     >,
 ) {
-    let mut partial_paths = HashMap::new();
+    let partial_paths = Arc::new(Mutex::new(HashMap::new()));
 
-    for (current_position, end_position, mut path, mut traversal_index, mut check_path) in
-        &mut query
-    {
-        let start_position = if let (Some(path), Some(index)) = (&path.0, &traversal_index.0) {
-            if *index < path.len() - 1 {
-                path[index + 1]
+    query.par_for_each_mut(
+        64,
+        |(current_position, end_position, mut path, mut traversal_index, mut check_path)| {
+            let start_position = if let (Some(path), Some(index)) = (&path.0, &traversal_index.0) {
+                if *index < path.len() - 1 {
+                    path[index + 1]
+                } else {
+                    current_position.0
+                }
             } else {
                 current_position.0
-            }
-        } else {
-            current_position.0
-        };
+            };
+            let mut partial_paths = partial_paths.lock().unwrap();
 
-        if check_path.0 {
-            let d_p = matrix.astar(
-                start_position,
-                end_position.0,
-                &manhattan_heuristic,
-                &partial_paths,
-            );
+            if check_path.0 {
+                let d_p = matrix.astar(
+                    start_position,
+                    end_position.0,
+                    &manhattan_heuristic,
+                    &partial_paths,
+                );
 
-            if let Some(d_p) = &d_p {
-                let size = d_p.len();
+                if let Some(d_p) = &d_p {
+                    let size = d_p.len();
 
-                d_p.iter()
-                    .enumerate()
-                    .filter(|tuple| tuple.0 + 1 < size)
-                    .for_each(|tuple| {
-                        partial_paths
-                            .entry(*tuple.1)
-                            .or_insert_with(|| d_p[tuple.0 + 1..].to_vec());
-                    });
+                    d_p.iter()
+                        .enumerate()
+                        .filter(|tuple| tuple.0 + 1 < size)
+                        .for_each(|tuple| {
+                            partial_paths
+                                .entry(*tuple.1)
+                                .or_insert_with(|| d_p[tuple.0 + 1..].to_vec());
+                        });
 
-                if traversal_index.0 != Some(0) {
-                    *traversal_index = TraversalIndex(Some(0));
+                    if traversal_index.0 != Some(0) {
+                        *traversal_index = TraversalIndex(Some(0));
+                    }
+
+                    *check_path = CheckPath(false);
                 }
 
-                *check_path = CheckPath(false);
-            }
+                if start_position != current_position.0 {
+                    *path = Path(Some(
+                        [Vec::from([current_position.0]), d_p.unwrap_or_default()].concat(),
+                    ));
+                } else {
+                    *path = Path(d_p);
+                }
 
-            if start_position != current_position.0 {
-                *path = Path(Some(
-                    [Vec::from([current_position.0]), d_p.unwrap_or_default()].concat(),
-                ));
-            } else {
-                *path = Path(d_p);
+                if !path.0.is_some() {
+                    *traversal_index = TraversalIndex(None);
+                }
             }
-
-            if !path.0.is_some() {
-                *traversal_index = TraversalIndex(None);
-            }
-        }
-    }
+        },
+    )
 }
 
 fn track_player_system(
@@ -251,10 +257,7 @@ fn traverse_path(
         &mut TraversalIndex,
         &mut Visibility,
     )>,
-    p_query: Query<
-        (&PlayerPosition, &LivePosition),
-        Or<(Changed<PlayerPosition>, Changed<LivePosition>)>,
-    >,
+    p_query: Query<(&PlayerPosition, &LivePosition)>,
 ) {
     for (player_position, live_position) in &p_query {
         for (
@@ -288,19 +291,16 @@ fn traverse_path(
                         col_0 + (col_1 - col_0) * delta_factor,
                     );
 
-                    transform.translation.x = (position.1 as f32 - live_position.0 .1)
-                        * node_size.0 .0
-                        + node_size.0 .0 / 2.;
-                    transform.translation.y = (live_position.0 .0 - position.0 as f32)
-                        * node_size.0 .1
-                        - node_size.0 .1 / 2.;
-                    transform.translation.z = 100.;
-
-                    *visibility = Visibility::VISIBLE;
+                    transform.translation.x =
+                        (position.1 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
+                    transform.translation.y =
+                        (live_position.0 .0 - position.0) * node_size.0 .1 - node_size.0 .1 / 2.;
 
                     if at_end {
                         *traversal_index = TraversalIndex(Some(index + 1));
                     }
+
+                    *visibility = Visibility::VISIBLE;
                 } else {
                     if path[path.len() - 1] == player_position.current_position.0 {
                         commands.entity(entity).despawn();
@@ -361,6 +361,14 @@ fn spawn_robot(
         })
         .insert(SpriteBundle {
             texture: asset_server.load("robot.png"),
+            transform: Transform {
+                translation: Vec3 {
+                    x: 0.,
+                    y: 0.,
+                    z: 100.,
+                },
+                ..default()
+            },
             visibility: Visibility::INVISIBLE,
             ..default()
         });

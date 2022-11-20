@@ -179,9 +179,15 @@ fn traverse_path(
             let col_1 = to.0 .1 as f32;
 
             *live_position = if row_0 != row_1 {
-                LivePosition((row_0 + (row_1 - row_0) * delta_factor, col_0))
+                LivePosition((
+                    row_0 + (row_1 - row_0) * delta_factor,
+                    col_0 + (col_1 - col_0) * delta_factor,
+                ))
             } else {
-                LivePosition((row_0, col_0 + (col_1 - col_0) * delta_factor))
+                LivePosition((
+                    row_0 + (row_1 - row_0) * delta_factor,
+                    col_0 + (col_1 - col_0) * delta_factor,
+                ))
             };
 
             if at_end {

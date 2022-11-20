@@ -64,6 +64,14 @@ fn setup_system(mut commands: Commands, size: Res<GridSize>, node_size: Res<Node
                     custom_size: Some(Vec2::new(node_size.0 .0, node_size.0 .1)),
                     ..default()
                 },
+                transform: Transform {
+                    translation: Vec3 {
+                        x: 0.,
+                        y: 0.,
+                        z: 99.,
+                    },
+                    ..default()
+                },
                 ..default()
             });
     });
