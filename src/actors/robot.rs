@@ -52,14 +52,14 @@ pub struct RobotPlugin;
 impl Plugin for RobotPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system(setup_system)
-            .add_system(check_path)
             .add_system(track_player_system)
             .add_system_set(
                 SystemSet::new()
                     .with_run_criteria(FixedTimestep::step(1. / 10.))
-                    .with_system(calc_path),
+                    .with_system(calc_path.after(check_path)),
             )
-            .add_system(traverse_path)
+            .add_system(check_path)
+            .add_system(traverse_path.after(calc_path))
             .add_system(increment_path_traversal.after(traverse_path));
     }
 
@@ -356,7 +356,7 @@ fn spawn_robot(
         })
         .insert(CheckPath(true))
         .insert(AnimationSequence {
-            duration: Duration::from_millis(50 + (rng.gen::<f32>() * 2000.) as u64),
+            duration: Duration::from_millis(150 + (rng.gen::<f32>() * 1500.) as u64),
             snap: None,
         })
         .insert(SpriteBundle {
