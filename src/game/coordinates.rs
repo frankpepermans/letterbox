@@ -1,3 +1,5 @@
+use crate::Position;
+
 pub type Coordinates = (usize, usize);
 
 pub trait CreateCoordinates {
@@ -17,5 +19,11 @@ impl CreateCoordinates for Coordinates {
 
     fn col(&self) -> usize {
         self.1
+    }
+}
+
+impl Into<Position> for Coordinates {
+    fn into(self) -> Position {
+        Position(self)
     }
 }

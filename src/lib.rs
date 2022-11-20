@@ -23,6 +23,9 @@ pub struct NodeSize(pub (f32, f32));
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Position(pub Coordinates);
 
+#[derive(Component, Debug, Clone, Copy)]
+pub struct LivePosition(pub (f32, f32));
+
 #[derive(Resource)]
 pub struct RobotCount(pub i16);
 

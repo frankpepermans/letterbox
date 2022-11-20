@@ -3,8 +3,8 @@ use std::time::Duration;
 use bevy::prelude::*;
 
 use crate::{
-    game::matrix::Matrix, game::movement::Movement, game::node::Node, AnimationSequence, NodeSize,
-    Player, PlayerPosition, Position,
+    game::matrix::Matrix, game::movement::Movement, game::node::Node, AnimationSequence,
+    LivePosition, NodeSize, Player, PlayerPosition, Position,
 };
 
 pub struct PlayerPlugin;
@@ -26,11 +26,7 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-fn setup_system(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    _asset_server: Res<AssetServer>,
-) {
+fn setup_system(mut commands: Commands, asset_server: Res<AssetServer>, node_size: Res<NodeSize>) {
     commands
         .spawn_empty()
         .insert(Player {})
@@ -38,8 +34,17 @@ fn setup_system(
             current_position: Position((20, 20)),
             next_position: None,
         })
+        .insert(LivePosition((0., 0.)))
         .insert(SpriteBundle {
             texture: asset_server.load("player.png"),
+            transform: Transform {
+                translation: Vec3 {
+                    x: node_size.0 .0 / 2.,
+                    y: -node_size.0 .1 / 2.,
+                    z: 101.,
+                },
+                ..default()
+            },
             visibility: Visibility::INVISIBLE,
             ..default()
         })
@@ -136,27 +141,27 @@ fn update_player_position_system(
 
 fn traverse_path(
     time: Res<Time>,
-    windows: Res<Windows>,
-    node_size: Res<NodeSize>,
     mut query: Query<
         (
             &mut AnimationSequence,
             &mut PlayerPosition,
-            &mut Transform,
             &mut Visibility,
+            &mut LivePosition,
             &KeyState,
         ),
         With<Player>,
     >,
     matrix: Res<Matrix<Node>>,
 ) {
-    let window = windows.primary();
-
-    for (mut animation_sequence, mut player_position, mut transform, mut visibility, key_state) in
-        &mut query
+    for (
+        mut animation_sequence,
+        mut player_position,
+        mut visibility,
+        mut live_position,
+        key_state,
+    ) in &mut query
     {
         let params = (player_position.next_position, animation_sequence.snap);
-        let (w, h) = (window.width(), window.height());
 
         if let (Some(next_position), Some(start_duration)) = params {
             let delta = time.elapsed() - start_duration;
@@ -172,16 +177,12 @@ fn traverse_path(
             let row_1 = to.0 .0 as f32;
             let col_0 = from.1 as f32;
             let col_1 = to.0 .1 as f32;
-            let position = (
-                row_0 + (row_1 - row_0) * delta_factor,
-                col_0 + (col_1 - col_0) * delta_factor,
-            );
 
-            transform.translation.x =
-                -w / 2. + position.1 as f32 * node_size.0 .0 + node_size.0 .0 / 2.;
-            transform.translation.y =
-                h / 2. - position.0 as f32 * node_size.0 .1 - node_size.0 .1 / 2.;
-            transform.translation.z = 100.;
+            *live_position = if row_0 != row_1 {
+                LivePosition((row_0 + (row_1 - row_0) * delta_factor, col_0))
+            } else {
+                LivePosition((row_0, col_0 + (col_1 - col_0) * delta_factor))
+            };
 
             if at_end {
                 if let Some(down_key) = key_state.down_key {
@@ -253,17 +254,10 @@ fn traverse_path(
                 }
             }
         } else {
-            let window = windows.primary();
-
-            let (w, h) = (window.width(), window.height());
-
-            transform.translation.x = -w / 2.
-                + player_position.current_position.0 .1 as f32 * node_size.0 .0
-                + node_size.0 .0 / 2.;
-            transform.translation.y = h / 2.
-                - player_position.current_position.0 .0 as f32 * node_size.0 .1
-                - node_size.0 .1 / 2.;
-            transform.translation.z = 101.;
+            *live_position = LivePosition((
+                player_position.current_position.0 .0 as f32,
+                player_position.current_position.0 .1 as f32,
+            ));
         }
 
         *visibility = Visibility::VISIBLE;

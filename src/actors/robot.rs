@@ -9,11 +9,18 @@ use crate::{
         node::{Entry, Node},
     },
     game::{coordinates::Coordinates, matrix::Matrix},
-    AnimationSequence, GridSize, NodeSize, Player, PlayerPosition, Position, RobotCount,
+    AnimationSequence, GridSize, LivePosition, NodeSize, Player, PlayerPosition, Position,
+    RobotCount,
 };
 
 #[derive(Component, Clone, Copy)]
 struct EndPosition(Coordinates);
+
+impl Into<EndPosition> for Coordinates {
+    fn into(self) -> EndPosition {
+        EndPosition(self)
+    }
+}
 
 #[derive(Component)]
 struct Path(Option<Vec<Coordinates>>);
@@ -183,7 +190,7 @@ fn track_player_system(
 ) {
     for position in &p_query {
         for (mut end_position, mut check_path) in &mut query {
-            *end_position = EndPosition(position.current_position.0);
+            *end_position = position.current_position.0.into();
             *check_path = CheckPath(true);
         }
     }
@@ -207,7 +214,7 @@ fn increment_path_traversal(
                 let did_pos_change = current_position.0 != p[index];
 
                 if did_pos_change {
-                    *current_position = Position(p[index]);
+                    *current_position = p[index].into();
                 }
 
                 let at_end = did_pos_change
@@ -232,7 +239,6 @@ fn increment_path_traversal(
 
 fn traverse_path(
     time: Res<Time>,
-    windows: Res<Windows>,
     node_size: Res<NodeSize>,
     asset_server: Res<AssetServer>,
     grid_size: Res<GridSize>,
@@ -245,55 +251,63 @@ fn traverse_path(
         &mut TraversalIndex,
         &mut Visibility,
     )>,
-    p_query: Query<&PlayerPosition, With<Player>>,
+    p_query: Query<
+        (&PlayerPosition, &LivePosition),
+        Or<(Changed<PlayerPosition>, Changed<LivePosition>)>,
+    >,
 ) {
-    let window = windows.primary();
+    for (player_position, live_position) in &p_query {
+        for (
+            entity,
+            path,
+            animation_sequence,
+            mut transform,
+            mut traversal_index,
+            mut visibility,
+        ) in &mut query
+        {
+            let params = (&path.0, traversal_index.0, animation_sequence.snap);
 
-    for (entity, path, animation_sequence, mut transform, mut traversal_index, mut visibility) in
-        &mut query
-    {
-        let params = (&path.0, traversal_index.0, animation_sequence.snap);
+            if let (Some(path), Some(index), Some(start_duration)) = params {
+                if index < path.len() - 1 {
+                    let delta = time.elapsed() - start_duration;
+                    let mut delta_factor =
+                        delta.as_millis() as f32 / animation_sequence.duration.as_millis() as f32;
+                    let at_end = delta_factor > 1.;
 
-        if let (Some(path), Some(index), Some(start_duration)) = params {
-            if index < path.len() - 1 {
-                let delta = time.elapsed() - start_duration;
-                let mut delta_factor =
-                    delta.as_millis() as f32 / animation_sequence.duration.as_millis() as f32;
-                let at_end = delta_factor > 1.;
+                    delta_factor = delta_factor.clamp(0., 1.);
 
-                delta_factor = delta_factor.clamp(0., 1.);
+                    let from = path[index];
+                    let to = path[index + 1];
+                    let row_0 = from.0 as f32;
+                    let row_1 = to.0 as f32;
+                    let col_0 = from.1 as f32;
+                    let col_1 = to.1 as f32;
+                    let position = (
+                        row_0 + (row_1 - row_0) * delta_factor,
+                        col_0 + (col_1 - col_0) * delta_factor,
+                    );
 
-                let from = path[index];
-                let to = path[index + 1];
-                let row_0 = from.0 as f32;
-                let row_1 = to.0 as f32;
-                let col_0 = from.1 as f32;
-                let col_1 = to.1 as f32;
-                let position = (
-                    row_0 + (row_1 - row_0) * delta_factor,
-                    col_0 + (col_1 - col_0) * delta_factor,
-                );
-                let (w, h) = (window.width(), window.height());
+                    transform.translation.x = (position.1 as f32 - live_position.0 .1)
+                        * node_size.0 .0
+                        + node_size.0 .0 / 2.;
+                    transform.translation.y = (live_position.0 .0 - position.0 as f32)
+                        * node_size.0 .1
+                        - node_size.0 .1 / 2.;
+                    transform.translation.z = 100.;
 
-                transform.translation.x =
-                    -w / 2. + position.1 as f32 * node_size.0 .0 + node_size.0 .0 / 2.;
-                transform.translation.y =
-                    h / 2. - position.0 as f32 * node_size.0 .1 - node_size.0 .1 / 2.;
-                transform.translation.z = 100.;
+                    *visibility = Visibility::VISIBLE;
 
-                *visibility = Visibility::VISIBLE;
-
-                if at_end {
-                    *traversal_index = TraversalIndex(Some(index + 1));
-                }
-            } else {
-                for position in &p_query {
-                    if path[path.len() - 1] == position.current_position.0 {
+                    if at_end {
+                        *traversal_index = TraversalIndex(Some(index + 1));
+                    }
+                } else {
+                    if path[path.len() - 1] == player_position.current_position.0 {
                         commands.entity(entity).despawn();
 
                         spawn_robot(
                             &mut commands,
-                            position.current_position.0,
+                            player_position.current_position.0,
                             &asset_server,
                             &grid_size,
                         );
@@ -333,8 +347,8 @@ fn spawn_robot(
 
     commands
         .spawn(PathInstructionsBundle {
-            end_position: EndPosition(end_position),
-            current_position: Position(start_position),
+            end_position: end_position.into(),
+            current_position: start_position.into(),
         })
         .insert(PathBundle {
             path: Path(None),

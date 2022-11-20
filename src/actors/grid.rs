@@ -3,7 +3,8 @@ use bevy::prelude::*;
 use crate::{
     game::node::Node,
     game::{matrix::Matrix, node::Entry},
-    GridSize, NodeSize, Position, UserCursorPressedState, UserPosition,
+    GridSize, LivePosition, NodeSize, PlayerPosition, Position, UserCursorPressedState,
+    UserPosition,
 };
 
 pub struct GridPlugin;
@@ -71,17 +72,17 @@ fn setup_system(mut commands: Commands, size: Res<GridSize>, node_size: Res<Node
 }
 
 fn layout_grid_system(
-    windows: Res<Windows>,
     node_size: Res<NodeSize>,
-    mut query: Query<(&Position, &mut Transform), Or<(Changed<Node>, Changed<Position>)>>,
+    mut query: Query<(&Position, &mut Transform)>,
+    p_query: Query<&LivePosition, Or<(Changed<PlayerPosition>, Changed<LivePosition>)>>,
 ) {
-    let window = windows.primary();
-
-    for (position, mut transform) in &mut query {
-        transform.translation.x =
-            -window.width() / 2. + position.0 .1 as f32 * node_size.0 .0 + node_size.0 .0 / 2.;
-        transform.translation.y =
-            window.height() / 2. - position.0 .0 as f32 * node_size.0 .1 - node_size.0 .1 / 2.;
+    for live_position in &p_query {
+        for (position, mut transform) in &mut query {
+            transform.translation.x =
+                (position.0 .1 as f32 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
+            transform.translation.y =
+                (live_position.0 .0 - position.0 .0 as f32) * node_size.0 .1 - node_size.0 .1 / 2.;
+        }
     }
 }
 
