@@ -15,8 +15,8 @@ impl Movement for Matrix<Node> {
     fn nearest_neighbours(&self, index: Coordinates) -> Vec<Option<Coordinates>> {
         Vec::from([
             self.left(index),
-            self.up(index),
             self.right(index),
+            self.up(index),
             self.down(index),
         ])
     }

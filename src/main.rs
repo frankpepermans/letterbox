@@ -1,7 +1,4 @@
-use bevy::{
-    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
-    prelude::*,
-};
+use bevy::{prelude::*, window::PresentMode};
 
 use letterbox::{
     actors::{grid::GridPlugin, player::PlayerPlugin, robot::RobotPlugin},
@@ -24,12 +21,11 @@ fn main() {
             window: WindowDescriptor {
                 width: GRID_SIZE.1 as f32 * NODE_SIZE.0,
                 height: GRID_SIZE.0 as f32 * NODE_SIZE.1,
+                present_mode: PresentMode::AutoNoVsync,
                 ..default()
             },
             ..default()
         }))
-        .add_plugin(LogDiagnosticsPlugin::default())
-        .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(GridPlugin)
         .add_plugin(PlayerPlugin)
         .add_plugin(RobotPlugin)

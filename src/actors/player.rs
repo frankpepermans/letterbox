@@ -167,7 +167,7 @@ fn traverse_path(
             let delta = time.elapsed() - start_duration;
             let mut delta_factor =
                 delta.as_millis() as f32 / animation_sequence.duration.as_millis() as f32;
-            let at_end = delta_factor > 1.;
+            let at_end = delta_factor >= 1.;
 
             delta_factor = delta_factor.clamp(0., 1.);
 
