@@ -95,28 +95,28 @@ fn update_player_position_system(
 
         if position.next_position.is_none() {
             if key_code.just_pressed(KeyCode::Left) {
-                if let Some(next_node) = matrix.left(position.current_position.0) {
+                if let Some(next_node) = matrix.left(&position.current_position.0) {
                     *position = PlayerPosition {
                         current_position: position.current_position,
                         next_position: Some(Position(next_node)),
                     };
                 }
             } else if key_code.just_pressed(KeyCode::Right) {
-                if let Some(next_node) = matrix.right(position.current_position.0) {
+                if let Some(next_node) = matrix.right(&position.current_position.0) {
                     *position = PlayerPosition {
                         current_position: position.current_position,
                         next_position: Some(Position(next_node)),
                     };
                 }
             } else if key_code.just_pressed(KeyCode::Up) {
-                if let Some(next_node) = matrix.up(position.current_position.0) {
+                if let Some(next_node) = matrix.up(&position.current_position.0) {
                     *position = PlayerPosition {
                         current_position: position.current_position,
                         next_position: Some(Position(next_node)),
                     };
                 }
             } else if key_code.just_pressed(KeyCode::Down) {
-                if let Some(next_node) = matrix.down(position.current_position.0) {
+                if let Some(next_node) = matrix.down(&position.current_position.0) {
                     *position = PlayerPosition {
                         current_position: position.current_position,
                         next_position: Some(Position(next_node)),
@@ -194,7 +194,7 @@ fn traverse_path(
                 if let Some(down_key) = key_state.down_key {
                     match down_key {
                         KeyCode::Left => {
-                            if let Some(next_node) = matrix.left(next_position.0) {
+                            if let Some(next_node) = matrix.left(&next_position.0) {
                                 *player_position = PlayerPosition {
                                     current_position: next_position,
                                     next_position: Some(Position(next_node)),
@@ -207,7 +207,7 @@ fn traverse_path(
                             }
                         }
                         KeyCode::Right => {
-                            if let Some(next_node) = matrix.right(next_position.0) {
+                            if let Some(next_node) = matrix.right(&next_position.0) {
                                 *player_position = PlayerPosition {
                                     current_position: next_position,
                                     next_position: Some(Position(next_node)),
@@ -220,7 +220,7 @@ fn traverse_path(
                             }
                         }
                         KeyCode::Up => {
-                            if let Some(next_node) = matrix.up(next_position.0) {
+                            if let Some(next_node) = matrix.up(&next_position.0) {
                                 *player_position = PlayerPosition {
                                     current_position: next_position,
                                     next_position: Some(Position(next_node)),
@@ -233,7 +233,7 @@ fn traverse_path(
                             }
                         }
                         KeyCode::Down => {
-                            if let Some(next_node) = matrix.down(next_position.0) {
+                            if let Some(next_node) = matrix.down(&next_position.0) {
                                 *player_position = PlayerPosition {
                                     current_position: next_position,
                                     next_position: Some(Position(next_node)),

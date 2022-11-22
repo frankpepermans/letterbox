@@ -5,8 +5,8 @@ use std::time::Duration;
 use bevy::prelude::*;
 use game::{coordinates::Coordinates, node::Node};
 
-pub mod actors;
 pub mod game;
+pub mod plugin;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum UserCursorPressedState {

@@ -47,7 +47,7 @@ impl AStar for Matrix<Node> {
 
             let g_score_self = *lookup.get(&current.index).unwrap_or(&WEIGHT);
 
-            for n in self.nearest_neighbours(current.index) {
+            for n in self.nearest_neighbours(&current.index) {
                 if let Some(index) = n {
                     if !closed.contains_key(&index) {
                         let visited = lookup.get(&index);

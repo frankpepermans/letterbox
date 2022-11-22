@@ -1,11 +1,13 @@
 use bevy::prelude::*;
 
 use crate::{
-    game::node::Node,
     game::{matrix::Matrix, node::Entry},
+    game::{movement::Movement, node::Node},
     GridSize, LivePosition, NodeSize, PlayerPosition, Position, UserCursorPressedState,
     UserPosition,
 };
+
+use super::assets::GridTextures;
 
 pub struct GridPlugin;
 
@@ -94,33 +96,44 @@ fn layout_grid_system(
     }
 }
 
-fn render_grid_system(mut query: Query<(&Node, &mut Sprite), Changed<Node>>) {
-    for (node, mut sprite) in &mut query {
-        sprite.color = match node[Entry::LEFT] {
-            true => Color::rgb(249. / 255., 251. / 255., 236. / 255.),
-            false => Color::rgb(0.5, 0.5, 0.5),
+fn render_grid_system(
+    grid_textures: Res<GridTextures>,
+    matrix: Res<Matrix<Node>>,
+    mut query: Query<(&Node, &Position, &mut Handle<Image>), Changed<Node>>,
+) {
+    for (node, position, mut handle) in &mut query {
+        *handle = match node[Entry::LEFT] {
+            true => grid_textures.random_floor_tile(&position),
+            false => {
+                let left = matrix.left(&position.0);
+                let top = matrix.up(&position.0);
+                let right = matrix.right(&position.0);
+                let bottom = matrix.down(&position.0);
+
+                grid_textures.resolve_wall_tile(&left, &top, &right, &bottom)
+            }
         };
     }
 }
 
 fn render_user_position_system(
-    windows: Res<Windows>,
     node_size: Res<NodeSize>,
     mut pos_query: Query<(&UserPosition, &mut Transform), Changed<UserPosition>>,
     query: Query<&Position, With<Node>>,
+    p_query: Query<&LivePosition, Or<(Changed<PlayerPosition>, Changed<LivePosition>)>>,
 ) {
-    let window = windows.primary();
-
     for (user_position, mut transform) in &mut pos_query {
         for position in &query {
             if user_position.coordinates == Some(position.0) {
-                transform.translation.x = -window.width() / 2.
-                    + position.0 .1 as f32 * node_size.0 .0
-                    + node_size.0 .0 / 2.;
-                transform.translation.y = window.height() / 2.
-                    - position.0 .0 as f32 * node_size.0 .1
-                    - node_size.0 .1 / 2.;
-                transform.translation.z = 100.;
+                for live_position in &p_query {
+                    transform.translation.x = (position.0 .1 as f32 - live_position.0 .1)
+                        * node_size.0 .0
+                        + node_size.0 .0 / 2.;
+                    transform.translation.y = (live_position.0 .0 - position.0 .0 as f32)
+                        * node_size.0 .1
+                        - node_size.0 .1 / 2.;
+                    transform.translation.z = 100.;
+                }
             }
         }
     }
@@ -131,28 +144,36 @@ fn update_user_position_coordinates_system(
     node_size: Res<NodeSize>,
     matrix: Res<Matrix<Node>>,
     mut query: Query<&mut UserPosition>,
+    n_query: Query<(&Position, &Transform), With<Node>>,
 ) {
     if let Some(window) = windows.get_primary() {
-        let h = window.height();
+        let w = window.width() / 2.;
+        let h = window.height() / 2.;
 
         if let Some(pos) = window.cursor_position() {
-            let row = (h - pos[1]) / node_size.0 .0;
-            let col = pos[0] / node_size.0 .1;
-            let coordinates = (row.floor() as usize, col.floor() as usize);
+            for (position, transform) in &n_query {
+                if pos.x - w >= transform.translation.x - node_size.0 .0 / 2.
+                    && pos.x - w < transform.translation.x + node_size.0 .1 - node_size.0 .0 / 2.
+                    && pos.y - h >= transform.translation.y - node_size.0 .1 / 2.
+                    && pos.y - h < transform.translation.y + node_size.0 .0 - node_size.0 .1 / 2.
+                {
+                    for mut user_position in &mut query {
+                        let mut val = user_position.coordinates;
 
-            for mut user_position in &mut query {
-                let mut val = user_position.coordinates;
+                        if matrix.contains(position.0) {
+                            val = Some(position.0);
+                        }
 
-                if matrix.contains(coordinates) {
-                    val = Some(coordinates);
-                }
+                        if user_position.coordinates != val {
+                            *user_position = UserPosition {
+                                coordinates: val,
+                                cursor_pressed_state: user_position.cursor_pressed_state,
+                                target_modification: user_position.target_modification,
+                            };
+                        }
 
-                if user_position.coordinates != val {
-                    *user_position = UserPosition {
-                        coordinates: val,
-                        cursor_pressed_state: user_position.cursor_pressed_state,
-                        target_modification: user_position.target_modification,
-                    };
+                        return;
+                    }
                 }
             }
         }
@@ -212,6 +233,16 @@ fn modify_single_node_system(
                 for (mut node, position) in &mut lookup_query {
                     if position.0 == coordinates {
                         *node = matrix[coordinates];
+                    } else if coordinates.0 > 0 && position.0 == (coordinates.0 - 1, coordinates.1)
+                    {
+                        *node = node.clone();
+                    } else if position.0 == (coordinates.0 + 1, coordinates.1) {
+                        *node = node.clone();
+                    } else if coordinates.1 > 0 && position.0 == (coordinates.0, coordinates.1 - 1)
+                    {
+                        *node = node.clone();
+                    } else if position.0 == (coordinates.0, coordinates.1 + 1) {
+                        *node = node.clone();
                     }
                 }
 
