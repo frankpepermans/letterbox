@@ -27,7 +27,7 @@ pub struct Position(pub Coordinates);
 pub struct LivePosition(pub (f32, f32));
 
 #[derive(Resource)]
-pub struct RobotCount(pub i16);
+pub struct EnemyCount(pub i16);
 
 #[derive(Component, Debug)]
 struct Player {}

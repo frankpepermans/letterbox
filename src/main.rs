@@ -7,8 +7,8 @@ use bevy::{
 
 use letterbox::{
     game::coordinates::Coordinates,
-    plugin::{assets::AssetsPlugin, grid::GridPlugin, player::PlayerPlugin, robot::RobotPlugin},
-    EnemySprites, GridSize, NodeSize, RobotCount,
+    plugin::{assets::AssetsPlugin, enemy::EnemyPlugin, grid::GridPlugin, player::PlayerPlugin},
+    EnemyCount, EnemySprites, GridSize, NodeSize,
 };
 
 // (rows, cols)
@@ -20,7 +20,7 @@ fn main() {
     App::new()
         .insert_resource(GridSize(GRID_SIZE))
         .insert_resource(NodeSize(NODE_SIZE))
-        .insert_resource(RobotCount(200))
+        .insert_resource(EnemyCount(200))
         .add_startup_system(setup_system)
         .add_plugins(
             DefaultPlugins
@@ -41,7 +41,7 @@ fn main() {
         .add_plugin(AssetsPlugin)
         .add_plugin(GridPlugin)
         .add_plugin(PlayerPlugin)
-        .add_plugin(RobotPlugin)
+        .add_plugin(EnemyPlugin)
         .run();
 }
 

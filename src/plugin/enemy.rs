@@ -13,8 +13,8 @@ use crate::{
         node::{Entry, Node},
     },
     game::{coordinates::Coordinates, matrix::Matrix},
-    AnimationSequence, EnemySprites, GridSize, LivePosition, NodeSize, Player, PlayerPosition,
-    Position, RobotCount,
+    AnimationSequence, EnemyCount, EnemySprites, GridSize, LivePosition, NodeSize, Player,
+    PlayerPosition, Position,
 };
 
 #[derive(Component, Clone, Copy)]
@@ -50,9 +50,9 @@ struct CheckPath(bool);
 #[derive(Component, Deref, DerefMut)]
 struct AnimationTimer(Timer);
 
-pub struct RobotPlugin;
+pub struct EnemyPlugin;
 
-impl Plugin for RobotPlugin {
+impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system_to_stage(StartupStage::PostStartup, setup_system)
             .add_system(track_player_system)
@@ -72,13 +72,13 @@ impl Plugin for RobotPlugin {
     }
 }
 
-fn setup_system(mut commands: Commands, robot_count: Res<RobotCount>, grid_size: Res<GridSize>) {
+fn setup_system(mut commands: Commands, enemy_count: Res<EnemyCount>, grid_size: Res<GridSize>) {
     let mut rng = rand::thread_rng();
 
-    (0..robot_count.0).for_each(|_| {
+    (0..enemy_count.0).for_each(|_| {
         let index = (rng.gen::<f32>() * 24.) as usize;
 
-        spawn_robot(&mut commands, (index, 49), &grid_size);
+        spawn_enemy(&mut commands, (index, 49), &grid_size);
     });
 }
 
@@ -318,7 +318,7 @@ fn traverse_path(
                     if path[path.len() - 1] == player_position.current_position.0 {
                         commands.entity(entity).despawn();
 
-                        spawn_robot(
+                        spawn_enemy(
                             &mut commands,
                             player_position.current_position.0,
                             &grid_size,
@@ -350,7 +350,7 @@ fn animate_sprite(
     }
 }
 
-fn spawn_robot(commands: &mut Commands, end_position: Coordinates, grid_size: &Res<GridSize>) {
+fn spawn_enemy(commands: &mut Commands, end_position: Coordinates, grid_size: &Res<GridSize>) {
     let mut rng = rand::thread_rng();
     let start_position = if rng.gen::<bool>() {
         if rng.gen::<bool>() {
