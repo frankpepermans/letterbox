@@ -13,8 +13,8 @@ use crate::{
         node::{Entry, Node},
     },
     game::{coordinates::Coordinates, matrix::Matrix},
-    AnimationSequence, GridSize, LivePosition, NodeSize, Player, PlayerPosition, Position,
-    RobotCount,
+    AnimationSequence, EnemySprites, GridSize, LivePosition, NodeSize, Player, PlayerPosition,
+    Position, RobotCount,
 };
 
 #[derive(Component, Clone, Copy)]
@@ -47,11 +47,14 @@ struct PathBundle {
 #[derive(Component)]
 struct CheckPath(bool);
 
+#[derive(Component, Deref, DerefMut)]
+struct AnimationTimer(Timer);
+
 pub struct RobotPlugin;
 
 impl Plugin for RobotPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(setup_system)
+        app.add_startup_system_to_stage(StartupStage::PostStartup, setup_system)
             .add_system(track_player_system)
             .add_system_set(
                 SystemSet::new()
@@ -60,7 +63,8 @@ impl Plugin for RobotPlugin {
             )
             .add_system(check_path)
             .add_system(traverse_path.after(calc_path))
-            .add_system(increment_path_traversal.after(traverse_path));
+            .add_system(increment_path_traversal.after(traverse_path))
+            .add_system(animate_sprite);
     }
 
     fn name(&self) -> &str {
@@ -68,18 +72,13 @@ impl Plugin for RobotPlugin {
     }
 }
 
-fn setup_system(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    robot_count: Res<RobotCount>,
-    grid_size: Res<GridSize>,
-) {
+fn setup_system(mut commands: Commands, robot_count: Res<RobotCount>, grid_size: Res<GridSize>) {
     let mut rng = rand::thread_rng();
 
     (0..robot_count.0).for_each(|_| {
         let index = (rng.gen::<f32>() * 24.) as usize;
 
-        spawn_robot(&mut commands, (index, 49), &asset_server, &grid_size);
+        spawn_robot(&mut commands, (index, 49), &grid_size);
     });
 }
 
@@ -204,23 +203,38 @@ fn track_player_system(
 
 fn increment_path_traversal(
     time: Res<Time>,
+    enemy_sprites: Res<EnemySprites>,
     mut query: Query<
         (
             &Path,
             &TraversalIndex,
             &mut AnimationSequence,
             &mut Position,
+            &mut Handle<TextureAtlas>,
         ),
         Or<(Changed<TraversalIndex>, Changed<Path>)>,
     >,
 ) {
-    for (path, traversal_index, mut animation_sequence, mut current_position) in &mut query {
+    for (
+        path,
+        traversal_index,
+        mut animation_sequence,
+        mut current_position,
+        mut texture_atlas_handle,
+    ) in &mut query
+    {
         if let (Some(p), Some(index)) = (&path.0, traversal_index.0) {
             if index < p.len() - 1 {
                 let did_pos_change = current_position.0 != p[index];
 
                 if did_pos_change {
                     *current_position = p[index].into();
+
+                    if index < p.len() - 2 {
+                        if let Some(handle) = enemy_sprites.find(p[index], p[index + 1], "bat") {
+                            *texture_atlas_handle = handle;
+                        }
+                    }
                 }
 
                 let at_end = did_pos_change
@@ -246,7 +260,6 @@ fn increment_path_traversal(
 fn traverse_path(
     time: Res<Time>,
     node_size: Res<NodeSize>,
-    asset_server: Res<AssetServer>,
     grid_size: Res<GridSize>,
     mut commands: Commands,
     mut query: Query<(
@@ -308,7 +321,6 @@ fn traverse_path(
                         spawn_robot(
                             &mut commands,
                             player_position.current_position.0,
-                            &asset_server,
                             &grid_size,
                         );
                     }
@@ -318,12 +330,27 @@ fn traverse_path(
     }
 }
 
-fn spawn_robot(
-    commands: &mut Commands,
-    end_position: Coordinates,
-    asset_server: &Res<AssetServer>,
-    grid_size: &Res<GridSize>,
+fn animate_sprite(
+    time: Res<Time>,
+    texture_atlases: Res<Assets<TextureAtlas>>,
+    mut query: Query<(
+        &mut AnimationTimer,
+        &mut TextureAtlasSprite,
+        &Handle<TextureAtlas>,
+    )>,
 ) {
+    for (mut timer, mut sprite, texture_atlas_handle) in &mut query {
+        timer.tick(time.delta());
+
+        if timer.just_finished() {
+            if let Some(handle) = texture_atlases.get(texture_atlas_handle) {
+                sprite.index = (sprite.index + 1) % handle.textures.len();
+            }
+        }
+    }
+}
+
+fn spawn_robot(commands: &mut Commands, end_position: Coordinates, grid_size: &Res<GridSize>) {
     let mut rng = rand::thread_rng();
     let start_position = if rng.gen::<bool>() {
         if rng.gen::<bool>() {
@@ -359,17 +386,19 @@ fn spawn_robot(
             duration: Duration::from_millis(150 + (rng.gen::<f32>() * 1500.) as u64),
             snap: None,
         })
-        .insert(SpriteBundle {
-            texture: asset_server.load("robot.png"),
-            transform: Transform {
-                translation: Vec3 {
-                    x: 0.,
-                    y: 0.,
-                    z: 100.,
+        .insert((
+            SpriteSheetBundle {
+                transform: Transform {
+                    translation: Vec3 {
+                        x: 0.,
+                        y: 0.,
+                        z: 100.,
+                    },
+                    ..default()
                 },
+                visibility: Visibility::INVISIBLE,
                 ..default()
             },
-            visibility: Visibility::INVISIBLE,
-            ..default()
-        });
+            AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
+        ));
 }
