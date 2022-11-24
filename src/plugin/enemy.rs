@@ -13,8 +13,8 @@ use crate::{
         node::{Entry, Node},
     },
     game::{coordinates::Coordinates, matrix::Matrix},
-    AnimationSequence, EnemyCount, EnemySprites, GridSize, LivePosition, NodeSize, Player,
-    PlayerPosition, Position,
+    AnimationSequence, EnemyCount, EnemySprites, EnemyTypeValue, GridSize, LivePosition, NodeSize,
+    Player, PlayerPosition, Position,
 };
 
 #[derive(Component, Clone, Copy)]
@@ -49,6 +49,11 @@ struct CheckPath(bool);
 
 #[derive(Component, Deref, DerefMut)]
 struct AnimationTimer(Timer);
+
+#[derive(Component)]
+struct EnemyType {
+    type_value: EnemyTypeValue,
+}
 
 pub struct EnemyPlugin;
 
@@ -208,6 +213,7 @@ fn increment_path_traversal(
         (
             &Path,
             &TraversalIndex,
+            &EnemyType,
             &mut AnimationSequence,
             &mut Position,
             &mut Handle<TextureAtlas>,
@@ -218,6 +224,7 @@ fn increment_path_traversal(
     for (
         path,
         traversal_index,
+        enemy_type,
         mut animation_sequence,
         mut current_position,
         mut texture_atlas_handle,
@@ -231,7 +238,9 @@ fn increment_path_traversal(
                     *current_position = p[index].into();
 
                     if index < p.len() - 2 {
-                        if let Some(handle) = enemy_sprites.find(p[index], p[index + 1], "bat") {
+                        if let Some(handle) =
+                            enemy_sprites.find(&p[index], &p[index + 1], &enemy_type.type_value)
+                        {
                             *texture_atlas_handle = handle;
                         }
                     }
@@ -385,6 +394,9 @@ fn spawn_enemy(commands: &mut Commands, end_position: Coordinates, grid_size: &R
         .insert(AnimationSequence {
             duration: Duration::from_millis(150 + (rng.gen::<f32>() * 1500.) as u64),
             snap: None,
+        })
+        .insert(EnemyType {
+            type_value: EnemyTypeValue::Bat,
         })
         .insert((
             SpriteSheetBundle {

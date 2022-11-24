@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use crate::{
     game::matrix::Matrix, game::movement::Movement, game::node::Node, AnimationSequence,
-    LivePosition, NodeSize, Player, PlayerPosition, Position,
+    LivePosition, NodeSize, Player, PlayerPosition, PlayerSprites, Position,
 };
 
 pub struct PlayerPlugin;
@@ -14,11 +14,16 @@ struct KeyState {
     down_key: Option<KeyCode>,
 }
 
+#[derive(Component, Deref, DerefMut)]
+struct AnimationTimer(Timer);
+
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(setup_system)
+        app.add_startup_system_to_stage(StartupStage::PostStartup, setup_system)
             .add_system(update_player_position_system)
-            .add_system(traverse_path);
+            .add_system(traverse_path)
+            .add_system(update_sprite)
+            .add_system(animate_sprite);
     }
 
     fn name(&self) -> &str {
@@ -26,7 +31,11 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-fn setup_system(mut commands: Commands, asset_server: Res<AssetServer>, node_size: Res<NodeSize>) {
+fn setup_system(
+    mut commands: Commands,
+    node_size: Res<NodeSize>,
+    player_sprites: Res<PlayerSprites>,
+) {
     commands
         .spawn_empty()
         .insert(Player {})
@@ -35,19 +44,22 @@ fn setup_system(mut commands: Commands, asset_server: Res<AssetServer>, node_siz
             next_position: None,
         })
         .insert(LivePosition((0., 0.)))
-        .insert(SpriteBundle {
-            texture: asset_server.load("player.png"),
-            transform: Transform {
-                translation: Vec3 {
-                    x: node_size.0 .0 / 2.,
-                    y: -node_size.0 .1 / 2.,
-                    z: 101.,
+        .insert((
+            SpriteSheetBundle {
+                texture_atlas: player_sprites.hero_down.clone(),
+                transform: Transform {
+                    translation: Vec3 {
+                        x: node_size.0 .0 / 2.,
+                        y: -node_size.0 .1 / 2.,
+                        z: 101.,
+                    },
+                    ..default()
                 },
+                visibility: Visibility::INVISIBLE,
                 ..default()
             },
-            visibility: Visibility::INVISIBLE,
-            ..default()
-        })
+            AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
+        ))
         .insert(AnimationSequence {
             duration: Duration::from_millis(100),
             snap: None,
@@ -267,5 +279,39 @@ fn traverse_path(
         }
 
         *visibility = Visibility::VISIBLE;
+    }
+}
+
+fn update_sprite(
+    player_sprites: Res<PlayerSprites>,
+    mut query: Query<(&PlayerPosition, &mut Handle<TextureAtlas>), Changed<PlayerPosition>>,
+) {
+    for (position, mut texture_atlas_handle) in &mut query {
+        if let Some(to) = position.next_position {
+            *texture_atlas_handle = player_sprites.find(&position.current_position.0, &to.0);
+        }
+    }
+}
+
+fn animate_sprite(
+    time: Res<Time>,
+    texture_atlases: Res<Assets<TextureAtlas>>,
+    mut query: Query<(
+        &mut AnimationTimer,
+        &mut TextureAtlasSprite,
+        &Handle<TextureAtlas>,
+        &PlayerPosition,
+    )>,
+) {
+    for (mut timer, mut sprite, texture_atlas_handle, position) in &mut query {
+        if position.next_position.is_some() {
+            timer.tick(time.delta());
+
+            if timer.just_finished() {
+                if let Some(handle) = texture_atlases.get(texture_atlas_handle) {
+                    sprite.index = (sprite.index + 1) % handle.textures.len();
+                }
+            }
+        }
     }
 }

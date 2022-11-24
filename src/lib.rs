@@ -59,6 +59,10 @@ pub struct EnemySprites {
     pub bat_right: Handle<TextureAtlas>,
 }
 
+pub enum EnemyTypeValue {
+    Bat,
+}
+
 impl EnemySprites {
     pub fn init(
         asset_server: &Res<AssetServer>,
@@ -102,12 +106,12 @@ impl EnemySprites {
 
     pub fn find(
         &self,
-        from: Coordinates,
-        to: Coordinates,
-        name: &str,
+        from: &Coordinates,
+        to: &Coordinates,
+        type_value: &EnemyTypeValue,
     ) -> Option<Handle<TextureAtlas>> {
-        match name {
-            "bat" => Some(if from.1 > to.1 {
+        match type_value {
+            EnemyTypeValue::Bat => Some(if from.1 > to.1 {
                 self.bat_left.clone()
             } else if from.1 < to.1 {
                 self.bat_right.clone()
@@ -116,7 +120,68 @@ impl EnemySprites {
             } else {
                 self.bat_down.clone()
             }),
-            _ => None,
+        }
+    }
+}
+
+#[derive(Resource)]
+pub struct PlayerSprites {
+    pub hero_up: Handle<TextureAtlas>,
+    pub hero_down: Handle<TextureAtlas>,
+    pub hero_left: Handle<TextureAtlas>,
+    pub hero_right: Handle<TextureAtlas>,
+}
+
+impl PlayerSprites {
+    pub fn init(
+        asset_server: &Res<AssetServer>,
+        texture_atlases: &mut ResMut<Assets<TextureAtlas>>,
+    ) -> Self {
+        Self {
+            hero_up: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("hero_up.png"),
+                Vec2::new(25., 25.),
+                1,
+                4,
+                None,
+                None,
+            )),
+            hero_down: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("hero_down.png"),
+                Vec2::new(25., 25.),
+                1,
+                4,
+                None,
+                None,
+            )),
+            hero_left: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("hero_left.png"),
+                Vec2::new(25., 25.),
+                1,
+                4,
+                None,
+                None,
+            )),
+            hero_right: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("hero_right.png"),
+                Vec2::new(25., 25.),
+                1,
+                4,
+                None,
+                None,
+            )),
+        }
+    }
+
+    pub fn find(&self, from: &Coordinates, to: &Coordinates) -> Handle<TextureAtlas> {
+        if from.1 > to.1 {
+            self.hero_left.clone()
+        } else if from.1 < to.1 {
+            self.hero_right.clone()
+        } else if from.0 > to.0 {
+            self.hero_up.clone()
+        } else {
+            self.hero_down.clone()
         }
     }
 }
