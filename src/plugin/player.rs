@@ -48,6 +48,7 @@ fn setup_system(
             SpriteSheetBundle {
                 texture_atlas: player_sprites.hero_down.clone(),
                 transform: Transform {
+                    scale: Vec3::splat(node_size.0 .0 as f32 / player_sprites.size),
                     translation: Vec3 {
                         x: node_size.0 .0 / 2.,
                         y: -node_size.0 .1 / 2.,

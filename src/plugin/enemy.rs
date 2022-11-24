@@ -77,13 +77,25 @@ impl Plugin for EnemyPlugin {
     }
 }
 
-fn setup_system(mut commands: Commands, enemy_count: Res<EnemyCount>, grid_size: Res<GridSize>) {
+fn setup_system(
+    mut commands: Commands,
+    enemy_count: Res<EnemyCount>,
+    grid_size: Res<GridSize>,
+    node_size: Res<NodeSize>,
+    enemy_sprites: Res<EnemySprites>,
+) {
     let mut rng = rand::thread_rng();
 
     (0..enemy_count.0).for_each(|_| {
         let index = (rng.gen::<f32>() * 24.) as usize;
 
-        spawn_enemy(&mut commands, (index, 49), &grid_size);
+        spawn_enemy(
+            &mut commands,
+            (index, 49),
+            &grid_size,
+            &node_size,
+            &enemy_sprites,
+        );
     });
 }
 
@@ -270,6 +282,7 @@ fn traverse_path(
     time: Res<Time>,
     node_size: Res<NodeSize>,
     grid_size: Res<GridSize>,
+    enemy_sprites: Res<EnemySprites>,
     mut commands: Commands,
     mut query: Query<(
         Entity,
@@ -331,6 +344,8 @@ fn traverse_path(
                             &mut commands,
                             player_position.current_position.0,
                             &grid_size,
+                            &node_size,
+                            &enemy_sprites,
                         );
                     }
                 }
@@ -359,7 +374,13 @@ fn animate_sprite(
     }
 }
 
-fn spawn_enemy(commands: &mut Commands, end_position: Coordinates, grid_size: &Res<GridSize>) {
+fn spawn_enemy(
+    commands: &mut Commands,
+    end_position: Coordinates,
+    grid_size: &Res<GridSize>,
+    node_size: &Res<NodeSize>,
+    enemy_sprites: &Res<EnemySprites>,
+) {
     let mut rng = rand::thread_rng();
     let start_position = if rng.gen::<bool>() {
         if rng.gen::<bool>() {
@@ -401,6 +422,7 @@ fn spawn_enemy(commands: &mut Commands, end_position: Coordinates, grid_size: &R
         .insert((
             SpriteSheetBundle {
                 transform: Transform {
+                    scale: Vec3::splat(node_size.0 .0 as f32 / enemy_sprites.size),
                     translation: Vec3 {
                         x: 0.,
                         y: 0.,

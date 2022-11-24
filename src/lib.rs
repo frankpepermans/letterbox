@@ -53,6 +53,7 @@ struct PlayerPosition {
 
 #[derive(Resource)]
 pub struct EnemySprites {
+    pub size: f32,
     pub bat_up: Handle<TextureAtlas>,
     pub bat_down: Handle<TextureAtlas>,
     pub bat_left: Handle<TextureAtlas>,
@@ -69,6 +70,7 @@ impl EnemySprites {
         texture_atlases: &mut ResMut<Assets<TextureAtlas>>,
     ) -> Self {
         Self {
+            size: 32.,
             bat_up: texture_atlases.add(TextureAtlas::from_grid(
                 asset_server.load("bat_up.png"),
                 Vec2::new(32., 32.),
@@ -126,6 +128,7 @@ impl EnemySprites {
 
 #[derive(Resource)]
 pub struct PlayerSprites {
+    pub size: f32,
     pub hero_up: Handle<TextureAtlas>,
     pub hero_down: Handle<TextureAtlas>,
     pub hero_left: Handle<TextureAtlas>,
@@ -138,6 +141,7 @@ impl PlayerSprites {
         texture_atlases: &mut ResMut<Assets<TextureAtlas>>,
     ) -> Self {
         Self {
+            size: 25.,
             hero_up: texture_atlases.add(TextureAtlas::from_grid(
                 asset_server.load("hero_up.png"),
                 Vec2::new(25., 25.),
