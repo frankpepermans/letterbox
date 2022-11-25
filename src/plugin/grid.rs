@@ -1,13 +1,20 @@
 use bevy::prelude::*;
+use mapgen::{
+    filter::CellularAutomata, AreaStartingPosition, CullUnreachable, MapBuilder, NoiseGenerator,
+    XStart, YStart,
+};
 
 use crate::{
-    game::{matrix::Matrix, node::Entry},
+    game::{coordinates::Coordinates, matrix::Matrix, node::Entry},
     game::{movement::Movement, node::Node},
     GridSize, LivePosition, NodeSize, PlayerPosition, Position, UserCursorPressedState,
     UserPosition,
 };
 
 use super::assets::GridTextures;
+
+#[derive(Resource)]
+pub struct OpenNodes(pub Vec<Coordinates>);
 
 pub struct GridPlugin;
 
@@ -33,8 +40,9 @@ fn setup_system(mut commands: Commands, size: Res<GridSize>, node_size: Res<Node
     let rows = size.0 .0;
     let cols = size.0 .1;
     let mut m = Matrix::new(rows, cols, Node::open());
+    let open_nodes = prepare_grid(&size, &mut m);
 
-    prepare_grid(&mut m);
+    commands.insert_resource(OpenNodes(open_nodes));
 
     commands
         .spawn(UserPosition {
@@ -258,44 +266,26 @@ fn modify_single_node_system(
     }
 }
 
-fn prepare_grid(m: &mut Matrix<Node>) {
-    m[(2, 2)] = Node::closed();
-    m[(3, 2)] = Node::closed();
-    m[(4, 2)] = Node::closed();
-    m[(5, 2)] = Node::closed();
-    m[(7, 2)] = Node::closed();
+fn prepare_grid(size: &Res<GridSize>, m: &mut Matrix<Node>) -> Vec<Coordinates> {
+    let rows = size.0 .0;
+    let cols = size.0 .1;
+    let map = MapBuilder::new(rows, cols)
+        .with(NoiseGenerator::uniform())
+        .with(CellularAutomata::new())
+        .with(AreaStartingPosition::new(XStart::CENTER, YStart::CENTER))
+        .with(CullUnreachable::new())
+        .build();
+    let mut open_nodes = Vec::new();
 
-    m[(0, 4)] = Node::closed();
-    m[(1, 4)] = Node::closed();
-    m[(2, 4)] = Node::closed();
-    m[(3, 4)] = Node::closed();
-    m[(4, 4)] = Node::closed();
+    map.tiles.into_iter().enumerate().for_each(|it| {
+        let coordinates = (it.0 % cols, it.0 / rows);
 
-    m[(6, 4)] = Node::closed();
-    m[(7, 4)] = Node::closed();
-    m[(9, 4)] = Node::closed();
-    m[(10, 4)] = Node::closed();
-    m[(11, 4)] = Node::closed();
+        if it.1.is_blocked() {
+            m[coordinates] = Node::closed();
+        } else {
+            open_nodes.push(coordinates);
+        }
+    });
 
-    m[(2, 6)] = Node::closed();
-    m[(3, 6)] = Node::closed();
-    m[(4, 6)] = Node::closed();
-    m[(5, 6)] = Node::closed();
-    m[(6, 6)] = Node::closed();
-    m[(7, 6)] = Node::closed();
-    m[(9, 6)] = Node::closed();
-
-    m[(4, 5)] = Node::closed();
-    m[(4, 6)] = Node::closed();
-    m[(4, 7)] = Node::closed();
-    m[(4, 8)] = Node::closed();
-    m[(4, 9)] = Node::closed();
-    m[(4, 10)] = Node::closed();
-    m[(4, 11)] = Node::closed();
-
-    m[(0, 14)] = Node::closed();
-    m[(1, 14)] = Node::closed();
-    m[(2, 14)] = Node::closed();
-    m[(3, 14)] = Node::closed();
-    m[(4, 14)] = Node::closed();
+    open_nodes
 }

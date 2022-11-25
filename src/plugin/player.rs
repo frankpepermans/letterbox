@@ -1,11 +1,13 @@
-use std::time::Duration;
-
 use bevy::prelude::*;
+use rand::prelude::*;
+use std::time::Duration;
 
 use crate::{
     game::matrix::Matrix, game::movement::Movement, game::node::Node, AnimationSequence,
     LivePosition, NodeSize, Player, PlayerPosition, PlayerSprites, Position,
 };
+
+use super::grid::OpenNodes;
 
 pub struct PlayerPlugin;
 
@@ -34,13 +36,17 @@ impl Plugin for PlayerPlugin {
 fn setup_system(
     mut commands: Commands,
     node_size: Res<NodeSize>,
+    open_nodes: Res<OpenNodes>,
     player_sprites: Res<PlayerSprites>,
 ) {
+    let mut rng = rand::thread_rng();
+    let start_position = open_nodes.0[(rng.gen::<f32>() * open_nodes.0.len() as f32) as usize];
+
     commands
         .spawn_empty()
         .insert(Player {})
         .insert(PlayerPosition {
-            current_position: Position((20, 20)),
+            current_position: Position(start_position),
             next_position: None,
         })
         .insert(LivePosition((0., 0.)))

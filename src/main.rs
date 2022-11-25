@@ -12,9 +12,9 @@ use letterbox::{
 };
 
 // (rows, cols)
-const GRID_SIZE: (usize, usize) = (64, 64);
+const GRID_SIZE: (usize, usize) = (50, 50);
 // (width, height) in pixels
-const NODE_SIZE: (f32, f32) = (32., 32.);
+const NODE_SIZE: (f32, f32) = (48., 48.);
 
 fn main() {
     App::new()
@@ -27,8 +27,8 @@ fn main() {
                 .set(ImagePlugin::default_nearest())
                 .set(WindowPlugin {
                     window: WindowDescriptor {
-                        width: 1024.,
-                        height: 768.,
+                        width: 768.,
+                        height: 1024.,
                         present_mode: PresentMode::AutoNoVsync,
                         ..default()
                     },

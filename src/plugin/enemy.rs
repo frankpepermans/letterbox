@@ -13,9 +13,11 @@ use crate::{
         node::{Entry, Node},
     },
     game::{coordinates::Coordinates, matrix::Matrix},
-    AnimationSequence, EnemyCount, EnemySprites, EnemyTypeValue, GridSize, LivePosition, NodeSize,
-    Player, PlayerPosition, Position,
+    AnimationSequence, EnemyCount, EnemySprites, EnemyTypeValue, LivePosition, NodeSize, Player,
+    PlayerPosition, Position,
 };
+
+use super::grid::OpenNodes;
 
 #[derive(Component, Clone, Copy)]
 struct EndPosition(Coordinates);
@@ -80,8 +82,8 @@ impl Plugin for EnemyPlugin {
 fn setup_system(
     mut commands: Commands,
     enemy_count: Res<EnemyCount>,
-    grid_size: Res<GridSize>,
     node_size: Res<NodeSize>,
+    open_nodes: Res<OpenNodes>,
     enemy_sprites: Res<EnemySprites>,
 ) {
     let mut rng = rand::thread_rng();
@@ -92,8 +94,8 @@ fn setup_system(
         spawn_enemy(
             &mut commands,
             (index, 49),
-            &grid_size,
             &node_size,
+            &open_nodes,
             &enemy_sprites,
         );
     });
@@ -213,7 +215,10 @@ fn track_player_system(
     for position in &p_query {
         for (mut end_position, mut check_path) in &mut query {
             *end_position = position.current_position.0.into();
-            *check_path = CheckPath(true);
+
+            if !check_path.0 {
+                *check_path = CheckPath(true);
+            }
         }
     }
 }
@@ -281,7 +286,7 @@ fn increment_path_traversal(
 fn traverse_path(
     time: Res<Time>,
     node_size: Res<NodeSize>,
-    grid_size: Res<GridSize>,
+    open_nodes: Res<OpenNodes>,
     enemy_sprites: Res<EnemySprites>,
     mut commands: Commands,
     mut query: Query<(
@@ -343,8 +348,8 @@ fn traverse_path(
                         spawn_enemy(
                             &mut commands,
                             player_position.current_position.0,
-                            &grid_size,
                             &node_size,
+                            &open_nodes,
                             &enemy_sprites,
                         );
                     }
@@ -377,29 +382,16 @@ fn animate_sprite(
 fn spawn_enemy(
     commands: &mut Commands,
     end_position: Coordinates,
-    grid_size: &Res<GridSize>,
     node_size: &Res<NodeSize>,
+    open_nodes: &Res<OpenNodes>,
     enemy_sprites: &Res<EnemySprites>,
 ) {
     let mut rng = rand::thread_rng();
-    let start_position = if rng.gen::<bool>() {
-        if rng.gen::<bool>() {
-            ((rng.gen::<f32>() * grid_size.0 .0 as f32) as usize, 0)
-        } else {
-            (
-                (rng.gen::<f32>() * grid_size.0 .0 as f32) as usize,
-                grid_size.0 .1 - 1,
-            )
-        }
+    let start_position = open_nodes.0[(rng.gen::<f32>() * open_nodes.0.len() as f32) as usize];
+    let type_value = if rng.gen::<bool>() {
+        EnemyTypeValue::Bat
     } else {
-        if rng.gen::<bool>() {
-            (0, (rng.gen::<f32>() * grid_size.0 .1 as f32) as usize)
-        } else {
-            (
-                grid_size.0 .0 - 1,
-                (rng.gen::<f32>() * grid_size.0 .1 as f32) as usize,
-            )
-        }
+        EnemyTypeValue::Spider
     };
 
     commands
@@ -416,13 +408,14 @@ fn spawn_enemy(
             duration: Duration::from_millis(150 + (rng.gen::<f32>() * 1500.) as u64),
             snap: None,
         })
-        .insert(EnemyType {
-            type_value: EnemyTypeValue::Bat,
-        })
+        .insert(EnemyType { type_value })
         .insert((
             SpriteSheetBundle {
                 transform: Transform {
-                    scale: Vec3::splat(node_size.0 .0 as f32 / enemy_sprites.size),
+                    scale: Vec3::splat(
+                        (rng.gen::<f32>() * 0.5 + 0.75) * node_size.0 .0 as f32
+                            / enemy_sprites.size,
+                    ),
                     translation: Vec3 {
                         x: 0.,
                         y: 0.,

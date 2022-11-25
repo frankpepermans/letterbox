@@ -58,10 +58,15 @@ pub struct EnemySprites {
     pub bat_down: Handle<TextureAtlas>,
     pub bat_left: Handle<TextureAtlas>,
     pub bat_right: Handle<TextureAtlas>,
+    pub spider_up: Handle<TextureAtlas>,
+    pub spider_down: Handle<TextureAtlas>,
+    pub spider_left: Handle<TextureAtlas>,
+    pub spider_right: Handle<TextureAtlas>,
 }
 
 pub enum EnemyTypeValue {
     Bat,
+    Spider,
 }
 
 impl EnemySprites {
@@ -103,6 +108,38 @@ impl EnemySprites {
                 None,
                 None,
             )),
+            spider_up: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("spider_up.png"),
+                Vec2::new(32., 32.),
+                6,
+                1,
+                None,
+                None,
+            )),
+            spider_down: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("spider_down.png"),
+                Vec2::new(32., 32.),
+                6,
+                1,
+                None,
+                None,
+            )),
+            spider_left: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("spider_left.png"),
+                Vec2::new(32., 32.),
+                6,
+                1,
+                None,
+                None,
+            )),
+            spider_right: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("spider_right.png"),
+                Vec2::new(32., 32.),
+                6,
+                1,
+                None,
+                None,
+            )),
         }
     }
 
@@ -121,6 +158,15 @@ impl EnemySprites {
                 self.bat_up.clone()
             } else {
                 self.bat_down.clone()
+            }),
+            EnemyTypeValue::Spider => Some(if from.1 > to.1 {
+                self.spider_left.clone()
+            } else if from.1 < to.1 {
+                self.spider_right.clone()
+            } else if from.0 > to.0 {
+                self.spider_up.clone()
+            } else {
+                self.spider_down.clone()
             }),
         }
     }

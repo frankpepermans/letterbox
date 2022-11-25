@@ -11,6 +11,7 @@ edition = "2021"
 bevy = "0.9.0"
 criterion = "0.4.0"
 flate2 = "1.0.24"
+mapgen = "0.5.2"
 rand = "0.8.5"
 raster = "0.0.7"
 
