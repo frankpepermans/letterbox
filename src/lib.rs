@@ -39,6 +39,9 @@ pub struct UserPosition {
     pub target_modification: Option<Node>,
 }
 
+#[derive(Component, Debug, Clone, Copy)]
+struct ProjectilePosition(pub (f32, f32));
+
 #[derive(Component)]
 struct AnimationSequence {
     snap: Option<Duration>,
@@ -49,6 +52,26 @@ struct AnimationSequence {
 struct PlayerPosition {
     current_position: Position,
     next_position: Option<Position>,
+}
+
+#[derive(Component)]
+struct Path(Option<Vec<Coordinates>>);
+
+#[derive(Component)]
+struct TraversalIndex(Option<usize>);
+
+#[derive(Component, Clone, Copy)]
+struct EndPosition(Coordinates);
+
+impl Into<EndPosition> for Coordinates {
+    fn into(self) -> EndPosition {
+        EndPosition(self)
+    }
+}
+
+#[derive(Component)]
+struct EnemyType {
+    type_value: EnemyTypeValue,
 }
 
 #[derive(Resource)]
@@ -232,6 +255,81 @@ impl PlayerSprites {
             self.hero_up.clone()
         } else {
             self.hero_down.clone()
+        }
+    }
+}
+
+#[derive(Resource)]
+pub struct AttackSprites {
+    pub size: f32,
+    pub sword: Handle<TextureAtlas>,
+}
+
+impl AttackSprites {
+    pub fn init(
+        asset_server: &Res<AssetServer>,
+        texture_atlases: &mut ResMut<Assets<TextureAtlas>>,
+    ) -> Self {
+        Self {
+            size: 16.,
+            sword: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("sword_attack.png"),
+                Vec2::new(32., 32.),
+                4,
+                1,
+                None,
+                None,
+            )),
+        }
+    }
+}
+
+#[derive(Resource)]
+pub struct ProjectileSprites {
+    pub size: f32,
+    pub knife: Handle<TextureAtlas>,
+}
+
+impl ProjectileSprites {
+    pub fn init(
+        asset_server: &Res<AssetServer>,
+        texture_atlases: &mut ResMut<Assets<TextureAtlas>>,
+    ) -> Self {
+        Self {
+            size: 64.,
+            knife: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("projectile_knife.png"),
+                Vec2::new(32., 32.),
+                4,
+                1,
+                None,
+                None,
+            )),
+        }
+    }
+}
+
+#[derive(Resource)]
+pub struct FragSprites {
+    pub size: f32,
+    pub blood: Handle<TextureAtlas>,
+}
+
+impl FragSprites {
+    pub fn init(
+        asset_server: &Res<AssetServer>,
+        texture_atlases: &mut ResMut<Assets<TextureAtlas>>,
+    ) -> Self {
+        Self {
+            size: 32.,
+            blood: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("enemy_frag.png"),
+                Vec2::new(32., 32.),
+                6,
+                1,
+                None,
+                None,
+            )),
         }
     }
 }

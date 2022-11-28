@@ -8,7 +8,8 @@ use bevy::{
 use letterbox::{
     game::coordinates::Coordinates,
     plugin::{assets::AssetsPlugin, enemy::EnemyPlugin, grid::GridPlugin, player::PlayerPlugin},
-    EnemyCount, EnemySprites, GridSize, NodeSize, PlayerSprites,
+    AttackSprites, EnemyCount, EnemySprites, FragSprites, GridSize, NodeSize, PlayerSprites,
+    ProjectileSprites,
 };
 
 // (rows, cols)
@@ -58,7 +59,10 @@ fn setup_system(
     });
 
     commands.insert_resource(PlayerSprites::init(&asset_server, &mut texture_atlases));
+    commands.insert_resource(AttackSprites::init(&asset_server, &mut texture_atlases));
     commands.insert_resource(EnemySprites::init(&asset_server, &mut texture_atlases));
+    commands.insert_resource(ProjectileSprites::init(&asset_server, &mut texture_atlases));
+    commands.insert_resource(FragSprites::init(&asset_server, &mut texture_atlases));
 }
 
 #[derive(Component)]

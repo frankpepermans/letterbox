@@ -7,7 +7,7 @@ use crate::{
     LivePosition, NodeSize, Player, PlayerPosition, PlayerSprites, Position,
 };
 
-use super::grid::OpenNodes;
+use super::{grid::OpenNodes, projectile::ProjectilePlugin};
 
 pub struct PlayerPlugin;
 
@@ -25,7 +25,8 @@ impl Plugin for PlayerPlugin {
             .add_system(update_player_position_system)
             .add_system(traverse_path)
             .add_system(update_sprite)
-            .add_system(animate_sprite);
+            .add_system(animate_sprite)
+            .add_plugin(ProjectilePlugin);
     }
 
     fn name(&self) -> &str {
@@ -68,7 +69,7 @@ fn setup_system(
             AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
         ))
         .insert(AnimationSequence {
-            duration: Duration::from_millis(100),
+            duration: Duration::from_millis(200),
             snap: None,
         })
         .insert(KeyState { down_key: None });

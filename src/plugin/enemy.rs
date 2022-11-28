@@ -13,26 +13,12 @@ use crate::{
         node::{Entry, Node},
     },
     game::{coordinates::Coordinates, matrix::Matrix},
-    AnimationSequence, EnemyCount, EnemySprites, EnemyTypeValue, LivePosition, NodeSize, Player,
-    PlayerPosition, Position,
+    AnimationSequence, EndPosition, EnemyCount, EnemySprites, EnemyType, EnemyTypeValue,
+    FragSprites, LivePosition, NodeSize, Path, Player, PlayerPosition, Position,
+    ProjectilePosition, TraversalIndex,
 };
 
 use super::grid::OpenNodes;
-
-#[derive(Component, Clone, Copy)]
-struct EndPosition(Coordinates);
-
-impl Into<EndPosition> for Coordinates {
-    fn into(self) -> EndPosition {
-        EndPosition(self)
-    }
-}
-
-#[derive(Component)]
-struct Path(Option<Vec<Coordinates>>);
-
-#[derive(Component)]
-struct TraversalIndex(Option<usize>);
 
 #[derive(Bundle)]
 struct PathInstructionsBundle {
@@ -53,9 +39,7 @@ struct CheckPath(bool);
 struct AnimationTimer(Timer);
 
 #[derive(Component)]
-struct EnemyType {
-    type_value: EnemyTypeValue,
-}
+struct FraggedAt(Coordinates);
 
 pub struct EnemyPlugin;
 
@@ -71,7 +55,9 @@ impl Plugin for EnemyPlugin {
             .add_system(check_path)
             .add_system(traverse_path.after(calc_path))
             .add_system(increment_path_traversal.after(traverse_path))
-            .add_system(animate_sprite);
+            .add_system(animate_sprite)
+            .add_system(hit_test_projectiles)
+            .add_system(animate_frag_sprite);
     }
 
     fn name(&self) -> &str {
@@ -286,28 +272,18 @@ fn increment_path_traversal(
 fn traverse_path(
     time: Res<Time>,
     node_size: Res<NodeSize>,
-    open_nodes: Res<OpenNodes>,
-    enemy_sprites: Res<EnemySprites>,
-    mut commands: Commands,
     mut query: Query<(
-        Entity,
         &Path,
         &AnimationSequence,
         &mut Transform,
         &mut TraversalIndex,
         &mut Visibility,
     )>,
-    p_query: Query<(&PlayerPosition, &LivePosition)>,
+    p_query: Query<&LivePosition>,
 ) {
-    for (player_position, live_position) in &p_query {
-        for (
-            entity,
-            path,
-            animation_sequence,
-            mut transform,
-            mut traversal_index,
-            mut visibility,
-        ) in &mut query
+    for live_position in &p_query {
+        for (path, animation_sequence, mut transform, mut traversal_index, mut visibility) in
+            &mut query
         {
             let params = (&path.0, traversal_index.0, animation_sequence.snap);
 
@@ -341,18 +317,6 @@ fn traverse_path(
                     }
 
                     *visibility = Visibility::VISIBLE;
-                } else {
-                    if path[path.len() - 1] == player_position.current_position.0 {
-                        commands.entity(entity).despawn();
-
-                        spawn_enemy(
-                            &mut commands,
-                            player_position.current_position.0,
-                            &node_size,
-                            &open_nodes,
-                            &enemy_sprites,
-                        );
-                    }
                 }
             }
         }
@@ -362,11 +326,14 @@ fn traverse_path(
 fn animate_sprite(
     time: Res<Time>,
     texture_atlases: Res<Assets<TextureAtlas>>,
-    mut query: Query<(
-        &mut AnimationTimer,
-        &mut TextureAtlasSprite,
-        &Handle<TextureAtlas>,
-    )>,
+    mut query: Query<
+        (
+            &mut AnimationTimer,
+            &mut TextureAtlasSprite,
+            &Handle<TextureAtlas>,
+        ),
+        With<EnemyType>,
+    >,
 ) {
     for (mut timer, mut sprite, texture_atlas_handle) in &mut query {
         timer.tick(time.delta());
@@ -374,6 +341,99 @@ fn animate_sprite(
         if timer.just_finished() {
             if let Some(handle) = texture_atlases.get(texture_atlas_handle) {
                 sprite.index = (sprite.index + 1) % handle.textures.len();
+            }
+        }
+    }
+}
+
+fn animate_frag_sprite(
+    mut commands: Commands,
+    time: Res<Time>,
+    node_size: Res<NodeSize>,
+    texture_atlases: Res<Assets<TextureAtlas>>,
+    mut query: Query<(
+        Entity,
+        &mut Transform,
+        &mut AnimationTimer,
+        &mut TextureAtlasSprite,
+        &Handle<TextureAtlas>,
+        &FraggedAt,
+    )>,
+    p_query: Query<&LivePosition>,
+) {
+    for (entity, mut transform, mut timer, mut sprite, texture_atlas_handle, fragged_at) in
+        &mut query
+    {
+        let live_position = p_query.single();
+
+        transform.translation.x =
+            (fragged_at.0 .1 as f32 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
+        transform.translation.y =
+            (live_position.0 .0 - fragged_at.0 .0 as f32) * node_size.0 .1 - node_size.0 .1 / 2.;
+
+        timer.tick(time.delta());
+
+        if timer.just_finished() {
+            if let Some(handle) = texture_atlases.get(texture_atlas_handle) {
+                let next_index = sprite.index + 1;
+
+                if next_index < handle.textures.len() {
+                    sprite.index = next_index;
+                } else {
+                    commands.entity(entity).despawn();
+                }
+            }
+        }
+    }
+}
+
+fn hit_test_projectiles(
+    mut commands: Commands,
+    node_size: Res<NodeSize>,
+    open_nodes: Res<OpenNodes>,
+    enemy_sprites: Res<EnemySprites>,
+    frag_sprites: Res<FragSprites>,
+    query: Query<(Entity, &Transform), With<ProjectilePosition>>,
+    e_query: Query<(Entity, &Transform, &Path, &TraversalIndex)>,
+    p_query: Query<&PlayerPosition, With<LivePosition>>,
+) {
+    for (entity, transform) in &query {
+        for (enemy_entity, enemy_transform, path, traversal_index) in &e_query {
+            if let (Some(path), Some(traversal_index)) = (&path.0, &traversal_index.0) {
+                let hit_box = Rect::new(
+                    enemy_transform.translation.x - node_size.0 .0 / 2.,
+                    enemy_transform.translation.y - node_size.0 .1 / 2.,
+                    enemy_transform.translation.x + node_size.0 .0 / 2.,
+                    enemy_transform.translation.y + node_size.0 .1 / 2.,
+                );
+
+                if hit_box.contains(Vec2::new(transform.translation.x, transform.translation.y)) {
+                    //commands.entity(entity).despawn();
+                    commands.entity(enemy_entity).despawn();
+
+                    let player_position = p_query.single();
+
+                    commands.spawn((
+                        SpriteSheetBundle {
+                            transform: Transform {
+                                translation: enemy_transform.translation,
+                                ..default()
+                            },
+                            texture_atlas: frag_sprites.blood.clone(),
+                            ..default()
+                        },
+                        AnimationTimer(Timer::from_seconds(0.3, TimerMode::Repeating)),
+                        FraggedAt(path[*traversal_index]),
+                    ));
+
+                    spawn_enemy(
+                        &mut commands,
+                        player_position.current_position.0,
+                        &node_size,
+                        &open_nodes,
+                        &enemy_sprites,
+                    );
+                }
             }
         }
     }
