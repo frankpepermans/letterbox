@@ -397,7 +397,7 @@ fn hit_test_projectiles(
     e_query: Query<(Entity, &Transform, &Path, &TraversalIndex)>,
     p_query: Query<&PlayerPosition, With<LivePosition>>,
 ) {
-    for (entity, transform) in &query {
+    for (_entity, transform) in &query {
         for (enemy_entity, enemy_transform, path, traversal_index) in &e_query {
             if let (Some(path), Some(traversal_index)) = (&path.0, &traversal_index.0) {
                 let hit_box = Rect::new(
@@ -416,13 +416,14 @@ fn hit_test_projectiles(
                     commands.spawn((
                         SpriteSheetBundle {
                             transform: Transform {
+                                scale: Vec3::splat(node_size.0 .0 as f32 / frag_sprites.size),
                                 translation: enemy_transform.translation,
                                 ..default()
                             },
                             texture_atlas: frag_sprites.blood.clone(),
                             ..default()
                         },
-                        AnimationTimer(Timer::from_seconds(0.3, TimerMode::Repeating)),
+                        AnimationTimer(Timer::from_seconds(0.15, TimerMode::Repeating)),
                         FraggedAt(path[*traversal_index]),
                     ));
 

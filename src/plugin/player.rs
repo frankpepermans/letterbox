@@ -66,7 +66,7 @@ fn setup_system(
                 visibility: Visibility::INVISIBLE,
                 ..default()
             },
-            AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
+            AnimationTimer(Timer::from_seconds(0.15, TimerMode::Repeating)),
         ))
         .insert(AnimationSequence {
             duration: Duration::from_millis(200),

@@ -76,7 +76,11 @@ fn launch_projectiles(
                         let position = path[*traversal_index];
                         let d = manhattan_heuristic(&p.0, &position);
 
-                        Some((d, position))
+                        if d <= 10 {
+                            Some((d, position))
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }

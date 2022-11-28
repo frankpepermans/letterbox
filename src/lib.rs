@@ -321,7 +321,7 @@ impl FragSprites {
         texture_atlases: &mut ResMut<Assets<TextureAtlas>>,
     ) -> Self {
         Self {
-            size: 32.,
+            size: 24.,
             blood: texture_atlases.add(TextureAtlas::from_grid(
                 asset_server.load("enemy_frag.png"),
                 Vec2::new(32., 32.),

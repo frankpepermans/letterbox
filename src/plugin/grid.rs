@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use mapgen::{
-    filter::CellularAutomata, AreaStartingPosition, CullUnreachable, MapBuilder, NoiseGenerator,
-    XStart, YStart,
+    filter::CellularAutomata, AreaStartingPosition, CullUnreachable, DrunkardsWalk, MapBuilder,
+    NoiseGenerator, XStart, YStart,
 };
 
 use crate::{
@@ -272,6 +272,7 @@ fn prepare_grid(size: &Res<GridSize>, m: &mut Matrix<Node>) -> Vec<Coordinates> 
     let map = MapBuilder::new(rows, cols)
         .with(NoiseGenerator::uniform())
         .with(CellularAutomata::new())
+        .with(DrunkardsWalk::open_halls())
         .with(AreaStartingPosition::new(XStart::CENTER, YStart::CENTER))
         .with(CullUnreachable::new())
         .build();
