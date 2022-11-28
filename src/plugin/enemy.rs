@@ -138,7 +138,7 @@ fn calc_path(
     let partial_paths = Arc::new(Mutex::new(HashMap::new()));
 
     query.par_for_each_mut(
-        64,
+        32,
         |(current_position, end_position, mut path, mut traversal_index, mut check_path)| {
             let start_position = if let (Some(path), Some(index)) = (&path.0, &traversal_index.0) {
                 if *index < path.len() - 1 {
@@ -449,10 +449,11 @@ fn spawn_enemy(
 ) {
     let mut rng = rand::thread_rng();
     let start_position = open_nodes.0[(rng.gen::<f32>() * open_nodes.0.len() as f32) as usize];
-    let type_value = if rng.gen::<bool>() {
-        EnemyTypeValue::Bat
-    } else {
-        EnemyTypeValue::Spider
+    let rnd = rng.gen_range(0..3);
+    let type_value = match rnd {
+        0 => EnemyTypeValue::Bat,
+        1 => EnemyTypeValue::Spider,
+        _ => EnemyTypeValue::Skeleton,
     };
 
     commands

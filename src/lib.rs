@@ -85,11 +85,16 @@ pub struct EnemySprites {
     pub spider_down: Handle<TextureAtlas>,
     pub spider_left: Handle<TextureAtlas>,
     pub spider_right: Handle<TextureAtlas>,
+    pub skeleton_up: Handle<TextureAtlas>,
+    pub skeleton_down: Handle<TextureAtlas>,
+    pub skeleton_left: Handle<TextureAtlas>,
+    pub skeleton_right: Handle<TextureAtlas>,
 }
 
 pub enum EnemyTypeValue {
     Bat,
     Spider,
+    Skeleton,
 }
 
 impl EnemySprites {
@@ -163,6 +168,38 @@ impl EnemySprites {
                 None,
                 None,
             )),
+            skeleton_up: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("skeleton_up.png"),
+                Vec2::new(32., 32.),
+                8,
+                1,
+                None,
+                None,
+            )),
+            skeleton_down: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("skeleton_down.png"),
+                Vec2::new(32., 32.),
+                8,
+                1,
+                None,
+                None,
+            )),
+            skeleton_left: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("skeleton_left.png"),
+                Vec2::new(32., 32.),
+                8,
+                1,
+                None,
+                None,
+            )),
+            skeleton_right: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("skeleton_right.png"),
+                Vec2::new(32., 32.),
+                8,
+                1,
+                None,
+                None,
+            )),
         }
     }
 
@@ -190,6 +227,15 @@ impl EnemySprites {
                 self.spider_up.clone()
             } else {
                 self.spider_down.clone()
+            }),
+            EnemyTypeValue::Skeleton => Some(if from.1 > to.1 {
+                self.skeleton_left.clone()
+            } else if from.1 < to.1 {
+                self.skeleton_right.clone()
+            } else if from.0 > to.0 {
+                self.skeleton_up.clone()
+            } else {
+                self.skeleton_down.clone()
             }),
         }
     }
