@@ -48,7 +48,7 @@ fn setup_system(mut commands: Commands) {
             piercing_count: PiercingCount(0),
         })
         .insert(AnimationTimer(Timer::from_seconds(
-            0.1,
+            0.2,
             TimerMode::Repeating,
         )));
 }
@@ -60,13 +60,14 @@ fn launch_projectiles(
     time: Res<Time>,
     mut query: Query<(&ProjectileCount, &PiercingCount, &mut AnimationTimer)>,
     e_query: Query<(&Path, &TraversalIndex)>,
-    p_query: Query<&PlayerPosition>,
+    p_query: Query<(&PlayerPosition, &LivePosition)>,
 ) {
     for (count, _piercing_count, mut timer) in &mut query {
         timer.tick(time.delta());
 
         if timer.just_finished() {
-            let p = p_query.single().current_position;
+            let tuple = p_query.single();
+            let (p, l) = (tuple.0.current_position, tuple.1);
 
             let mut valid_positions = e_query
                 .into_iter()
@@ -106,11 +107,12 @@ fn launch_projectiles(
                                 },
                                 ..default()
                             },
+                            visibility: Visibility::INVISIBLE,
                             ..default()
                         },
                         Angle(angle),
                         AnimationTimer(Timer::from_seconds(1. / 60., TimerMode::Repeating)),
-                        ProjectilePosition((p.0 .0 as f32, p.0 .1 as f32)),
+                        ProjectilePosition(l.0),
                     ));
                 });
             }
@@ -142,10 +144,11 @@ fn animate_projectiles(
         &mut ProjectilePosition,
         &mut AnimationTimer,
         &mut Transform,
+        &mut Visibility,
     )>,
     p_query: Query<&LivePosition, With<Player>>,
 ) {
-    for (angle, mut initial_position, mut timer, mut transform) in &mut query {
+    for (angle, mut initial_position, mut timer, mut transform, mut visibility) in &mut query {
         timer.tick(time.delta());
 
         if timer.just_finished() {
@@ -161,6 +164,10 @@ fn animate_projectiles(
                 transform.translation.y = (live_position.0 .0 - initial_position.0 .0)
                     * node_size.0 .1
                     - node_size.0 .1 / 2.;
+
+                if !visibility.is_visible {
+                    *visibility = Visibility::VISIBLE;
+                }
             }
         }
     }
