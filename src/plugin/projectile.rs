@@ -55,6 +55,7 @@ fn setup_system(mut commands: Commands) {
 
 fn launch_projectiles(
     mut commands: Commands,
+    matrix: Res<Matrix<Node>>,
     node_size: Res<NodeSize>,
     projectile_sprites: Res<ProjectileSprites>,
     time: Res<Time>,
@@ -74,6 +75,23 @@ fn launch_projectiles(
                 .filter_map(|(path, traversal_index)| {
                     if let (Some(path), Some(traversal_index)) = (&path.0, &traversal_index.0) {
                         let position = path[*traversal_index];
+                        let mut delta = l.0;
+                        let angle = (position.1 as f32 - l.0 .1 as f32)
+                            .atan2(position.0 as f32 - l.0 .0 as f32)
+                            + PI;
+                        let a_cos = angle.cos() / 6.;
+                        let a_sin = angle.sin() / 6.;
+                        let mut delta_r = (delta.0.round() as usize, delta.1.round() as usize);
+
+                        while delta_r != position {
+                            delta = (delta.0 - a_cos, delta.1 - a_sin);
+                            delta_r = (delta.0.round() as usize, delta.1.round() as usize);
+
+                            if matrix[delta_r] == Node::closed() {
+                                return None;
+                            }
+                        }
+
                         let d = manhattan_heuristic(&p.0, &position);
 
                         if d <= 10 {
@@ -94,8 +112,8 @@ fn launch_projectiles(
 
                 [0..size].iter().enumerate().for_each(|i| {
                     let target_position = valid_positions[i.0].1;
-                    let angle = (target_position.1 as f32 - p.0 .1 as f32)
-                        .atan2(target_position.0 as f32 - p.0 .0 as f32)
+                    let angle = (target_position.1 as f32 - l.0 .1 as f32)
+                        .atan2(target_position.0 as f32 - l.0 .0 as f32)
                         + PI;
 
                     commands.spawn((
@@ -130,10 +148,13 @@ fn hit_test_projectiles(
     query: Query<(Entity, &ProjectilePosition), Changed<ProjectilePosition>>,
 ) {
     for (entity, position) in &query {
-        if matrix[(
-            position.0 .0.round() as usize,
-            position.0 .1.round() as usize,
-        )] == Node::closed()
+        let (row, col) = (position.0 .0, position.0 .1);
+
+        if row < 0.
+            || row as usize >= matrix.rows
+            || col < 0.
+            || col as usize >= matrix.cols
+            || matrix[(row.round() as usize, col.round() as usize)] == Node::closed()
         {
             return commands.entity(entity).despawn();
         }
