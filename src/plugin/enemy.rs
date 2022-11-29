@@ -83,6 +83,7 @@ fn setup_system(
             &node_size,
             &open_nodes,
             &enemy_sprites,
+            None,
         );
     });
 }
@@ -433,6 +434,7 @@ fn hit_test_projectiles(
                         &node_size,
                         &open_nodes,
                         &enemy_sprites,
+                        Some(p_query.single()),
                     );
                 }
             }
@@ -446,9 +448,27 @@ fn spawn_enemy(
     node_size: &Res<NodeSize>,
     open_nodes: &Res<OpenNodes>,
     enemy_sprites: &Res<EnemySprites>,
+    player_position: Option<&PlayerPosition>,
 ) {
     let mut rng = rand::thread_rng();
-    let start_position = open_nodes.0[(rng.gen::<f32>() * open_nodes.0.len() as f32) as usize];
+    let nodes_in_range = if let Some(player_position) = player_position {
+        open_nodes
+            .0
+            .iter()
+            .filter_map(|it| {
+                let d = manhattan_heuristic(&player_position.current_position.0, it);
+
+                if d >= 10 && d < 20 {
+                    return Some(*it);
+                }
+
+                None
+            })
+            .collect::<Vec<Coordinates>>()
+    } else {
+        open_nodes.0.clone()
+    };
+    let start_position = nodes_in_range[(rng.gen::<f32>() * nodes_in_range.len() as f32) as usize];
     let rnd = rng.gen_range(0..3);
     let type_value = match rnd {
         0 => EnemyTypeValue::Bat,
