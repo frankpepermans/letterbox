@@ -277,14 +277,23 @@ fn prepare_grid(size: &Res<GridSize>, m: &mut Matrix<Node>) -> Vec<Coordinates> 
         .with(CullUnreachable::new())
         .build();
     let mut open_nodes = Vec::new();
+    let mut row = 0;
+    let mut col = 0;
 
-    map.tiles.into_iter().enumerate().for_each(|it| {
-        let coordinates = (it.0 % cols, it.0 / rows);
+    map.tiles.into_iter().for_each(|it| {
+        let coordinates = (row, col);
 
-        if it.1.is_blocked() {
+        if it.is_blocked() {
             m[coordinates] = Node::closed();
         } else {
             open_nodes.push(coordinates);
+        }
+
+        if col + 1 < m.cols {
+            col += 1;
+        } else {
+            row += 1;
+            col = 0;
         }
     });
 

@@ -151,9 +151,9 @@ fn hit_test_projectiles(
         let (row, col) = (position.0 .0, position.0 .1);
 
         if row < 0.
-            || row as usize >= matrix.rows
+            || row.round() as usize >= matrix.rows
             || col < 0.
-            || col as usize >= matrix.cols
+            || col.round() as usize >= matrix.cols
             || matrix[(row.round() as usize, col.round() as usize)] == Node::closed()
         {
             return commands.entity(entity).despawn();
