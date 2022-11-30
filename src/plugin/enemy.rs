@@ -125,6 +125,8 @@ fn check_path(
 
 fn calc_path(
     matrix: Res<Matrix<Node>>,
+    windows: Res<Windows>,
+    node_size: Res<NodeSize>,
     mut query: Query<
         (
             &Position,
@@ -137,6 +139,10 @@ fn calc_path(
     >,
 ) {
     let partial_paths = Arc::new(Mutex::new(HashMap::new()));
+    let window = windows.primary();
+    let g_w = window.width() / node_size.0 .0;
+    let g_h = window.height() / node_size.0 .1;
+    let g_s = (g_w * g_w + g_h * g_h).sqrt().ceil() as i32;
 
     query.par_for_each_mut(
         32,
@@ -153,42 +159,48 @@ fn calc_path(
             let mut partial_paths = partial_paths.lock().unwrap();
 
             if check_path.0 {
-                let d_p = matrix.astar(
-                    start_position,
-                    end_position.0,
-                    &manhattan_heuristic,
-                    &partial_paths,
-                );
+                if manhattan_heuristic(&start_position, &end_position.0) >= g_s {
+                    *path = Path(None);
+                    *traversal_index = TraversalIndex(None);
+                    *check_path = CheckPath(false);
+                } else {
+                    let d_p = matrix.astar(
+                        start_position,
+                        end_position.0,
+                        &manhattan_heuristic,
+                        &partial_paths,
+                    );
 
-                if let Some(d_p) = &d_p {
-                    let size = d_p.len();
+                    if let Some(d_p) = &d_p {
+                        let size = d_p.len();
 
-                    d_p.iter()
-                        .enumerate()
-                        .filter(|tuple| tuple.0 + 1 < size)
-                        .for_each(|tuple| {
-                            partial_paths
-                                .entry(*tuple.1)
-                                .or_insert_with(|| d_p[tuple.0 + 1..].to_vec());
-                        });
+                        d_p.iter()
+                            .enumerate()
+                            .filter(|tuple| tuple.0 + 1 < size)
+                            .for_each(|tuple| {
+                                partial_paths
+                                    .entry(*tuple.1)
+                                    .or_insert_with(|| d_p[tuple.0 + 1..].to_vec());
+                            });
 
-                    if traversal_index.0 != Some(0) {
-                        *traversal_index = TraversalIndex(Some(0));
+                        if traversal_index.0 != Some(0) {
+                            *traversal_index = TraversalIndex(Some(0));
+                        }
+
+                        *check_path = CheckPath(false);
                     }
 
-                    *check_path = CheckPath(false);
-                }
+                    if start_position != current_position.0 {
+                        *path = Path(Some(
+                            [Vec::from([current_position.0]), d_p.unwrap_or_default()].concat(),
+                        ));
+                    } else {
+                        *path = Path(d_p);
+                    }
 
-                if start_position != current_position.0 {
-                    *path = Path(Some(
-                        [Vec::from([current_position.0]), d_p.unwrap_or_default()].concat(),
-                    ));
-                } else {
-                    *path = Path(d_p);
-                }
-
-                if !path.0.is_some() {
-                    *traversal_index = TraversalIndex(None);
+                    if !path.0.is_some() {
+                        *traversal_index = TraversalIndex(None);
+                    }
                 }
             }
         },

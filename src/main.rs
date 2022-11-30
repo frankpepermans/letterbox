@@ -21,7 +21,7 @@ fn main() {
     App::new()
         .insert_resource(GridSize(GRID_SIZE))
         .insert_resource(NodeSize(NODE_SIZE))
-        .insert_resource(EnemyCount(200))
+        .insert_resource(EnemyCount(300))
         .add_startup_system(setup_system)
         .add_plugins(
             DefaultPlugins
