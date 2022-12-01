@@ -89,8 +89,8 @@ fn setup_system(
 }
 
 fn check_path_after_player(
-    mut query: Query<(&Path, &TraversalIndex, &mut CheckPath), With<AnimationSequence>>,
-    p_query: Query<&PlayerPosition, (With<Player>, Changed<PlayerPosition>)>,
+    p_query: Query<&PlayerPosition, (With<Player>)>,
+    mut query: Query<(&Path, &TraversalIndex, &mut CheckPath), With<EnemyType>>,
 ) {
     for _ in &p_query {
         for (path, traversal_index, mut check_path) in &mut query {
@@ -103,7 +103,7 @@ fn check_path_after_player(
 
 fn check_path_after_matrix_change(
     n_query: Query<(&Position, &Node), Changed<Node>>,
-    mut query: Query<(&Path, &TraversalIndex, &mut CheckPath), With<AnimationSequence>>,
+    mut query: Query<(&Path, &TraversalIndex, &mut CheckPath), With<EnemyType>>,
 ) {
     for (position, node) in &n_query {
         for (path, traversal_index, mut check_path) in &mut query {
