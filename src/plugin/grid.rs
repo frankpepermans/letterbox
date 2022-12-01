@@ -1,8 +1,9 @@
 use bevy::prelude::*;
 use mapgen::{
-    filter::CellularAutomata, AreaStartingPosition, CullUnreachable, DrunkardsWalk, MapBuilder,
+    AreaStartingPosition, CellularAutomata, CullUnreachable, DistantExit, MapBuilder,
     NoiseGenerator, XStart, YStart,
 };
+use rand::prelude::*;
 
 use crate::{
     game::{coordinates::Coordinates, matrix::Matrix, node::Entry},
@@ -266,16 +267,19 @@ fn modify_single_node_system(
     }
 }
 
+// see https://github.com/klangner/mapgen.rs/blob/master/demo/src/lib.rs
 fn prepare_grid(size: &Res<GridSize>, m: &mut Matrix<Node>) -> Vec<Coordinates> {
+    let mut t_rng = rand::thread_rng();
+    let mut rng = StdRng::seed_from_u64(t_rng.gen());
     let rows = size.0 .0;
     let cols = size.0 .1;
     let map = MapBuilder::new(rows, cols)
         .with(NoiseGenerator::uniform())
         .with(CellularAutomata::new())
-        .with(DrunkardsWalk::open_halls())
-        .with(AreaStartingPosition::new(XStart::CENTER, YStart::CENTER))
+        .with(AreaStartingPosition::new(XStart::LEFT, YStart::BOTTOM))
         .with(CullUnreachable::new())
-        .build();
+        .with(DistantExit::new())
+        .build_with_rng(&mut rng);
     let mut open_nodes = Vec::new();
     let mut row = 0;
     let mut col = 0;

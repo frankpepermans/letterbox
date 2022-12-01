@@ -50,9 +50,10 @@ impl Plugin for EnemyPlugin {
             .add_system_set(
                 SystemSet::new()
                     .with_run_criteria(FixedTimestep::step(1. / 10.))
-                    .with_system(calc_path.after(check_path)),
+                    .with_system(calc_path.after(check_path_after_player)),
             )
-            .add_system(check_path)
+            .add_system(check_path_after_matrix_change)
+            .add_system(check_path_after_player)
             .add_system(traverse_path.after(calc_path))
             .add_system(increment_path_traversal.after(traverse_path))
             .add_system(animate_sprite)
@@ -83,42 +84,42 @@ fn setup_system(
             &node_size,
             &open_nodes,
             &enemy_sprites,
-            None,
         );
     });
 }
 
-fn check_path(
+fn check_path_after_player(
+    mut query: Query<(&Path, &TraversalIndex, &mut CheckPath), With<AnimationSequence>>,
+    p_query: Query<&PlayerPosition, (With<Player>, Changed<PlayerPosition>)>,
+) {
+    for _ in &p_query {
+        for (path, traversal_index, mut check_path) in &mut query {
+            if (path.0.is_none() || traversal_index.0.is_none()) && !check_path.0 {
+                *check_path = CheckPath(true);
+            }
+        }
+    }
+}
+
+fn check_path_after_matrix_change(
     n_query: Query<(&Position, &Node), Changed<Node>>,
     mut query: Query<(&Path, &TraversalIndex, &mut CheckPath), With<AnimationSequence>>,
 ) {
-    for (path, traversal_index, mut check_path) in &mut query {
-        let mut affects_path = false;
-        let no_path = path.0.is_none() || traversal_index.0.is_none();
+    for (position, node) in &n_query {
+        for (path, traversal_index, mut check_path) in &mut query {
+            let no_path = path.0.is_none() || traversal_index.0.is_none();
 
-        for (position, node) in &n_query {
-            if node[Entry::LEFT] {
-                affects_path = true;
+            let affects_path = match node[Entry::LEFT] {
+                true => true,
+                false => match &path.0 {
+                    Some(path) => path.contains(&position.0),
+                    _ => false,
+                },
+            };
 
-                break;
+            if affects_path || (no_path && !check_path.0) {
+                *check_path = CheckPath(true);
             }
-
-            if let Some(path) = &path.0 {
-                path.contains(&position.0)
-            } else {
-                false
-            }
-            .then(|| {
-                affects_path = true;
-            });
-
-            if affects_path {
-                break;
-            }
-        }
-
-        if affects_path || (no_path && !check_path.0) {
-            *check_path = CheckPath(true);
         }
     }
 }
@@ -446,7 +447,6 @@ fn hit_test_projectiles(
                         &node_size,
                         &open_nodes,
                         &enemy_sprites,
-                        Some(p_query.single()),
                     );
                 }
             }
@@ -460,27 +460,9 @@ fn spawn_enemy(
     node_size: &Res<NodeSize>,
     open_nodes: &Res<OpenNodes>,
     enemy_sprites: &Res<EnemySprites>,
-    player_position: Option<&PlayerPosition>,
 ) {
     let mut rng = rand::thread_rng();
-    let nodes_in_range = if let Some(player_position) = player_position {
-        open_nodes
-            .0
-            .iter()
-            .filter_map(|it| {
-                let d = manhattan_heuristic(&player_position.current_position.0, it);
-
-                if d >= 10 && d < 20 {
-                    return Some(*it);
-                }
-
-                None
-            })
-            .collect::<Vec<Coordinates>>()
-    } else {
-        open_nodes.0.clone()
-    };
-    let start_position = nodes_in_range[(rng.gen::<f32>() * nodes_in_range.len() as f32) as usize];
+    let start_position = open_nodes.0[(rng.gen::<f32>() * open_nodes.0.len() as f32) as usize];
     let rnd = rng.gen_range(0..3);
     let type_value = match rnd {
         0 => EnemyTypeValue::Bat,
