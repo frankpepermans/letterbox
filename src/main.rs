@@ -13,7 +13,7 @@ use letterbox::{
 };
 
 // (rows, cols)
-const GRID_SIZE: (usize, usize) = (50, 50);
+const GRID_SIZE: (usize, usize) = (100, 100);
 // (width, height) in pixels
 const NODE_SIZE: (f32, f32) = (48., 48.);
 
@@ -21,7 +21,7 @@ fn main() {
     App::new()
         .insert_resource(GridSize(GRID_SIZE))
         .insert_resource(NodeSize(NODE_SIZE))
-        .insert_resource(EnemyCount(100))
+        .insert_resource(EnemyCount(1000))
         .add_startup_system(setup_system)
         .add_plugins(
             DefaultPlugins

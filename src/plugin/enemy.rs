@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use bevy::{prelude::*, time::FixedTimestep};
+use bevy::prelude::*;
 use rand::prelude::*;
 
 use crate::{
@@ -47,13 +47,8 @@ impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system_to_stage(StartupStage::PostStartup, setup_system)
             .add_system(track_player_system)
-            .add_system_set(
-                SystemSet::new()
-                    .with_run_criteria(FixedTimestep::step(1. / 10.))
-                    .with_system(calc_path.after(check_path_after_player)),
-            )
+            .add_system(calc_path.after(track_player_system))
             .add_system(check_path_after_matrix_change)
-            .add_system(check_path_after_player)
             .add_system(traverse_path.after(calc_path))
             .add_system(increment_path_traversal.after(traverse_path))
             .add_system(animate_sprite)
@@ -86,19 +81,6 @@ fn setup_system(
             &enemy_sprites,
         );
     });
-}
-
-fn check_path_after_player(
-    p_query: Query<&PlayerPosition, (With<Player>)>,
-    mut query: Query<(&Path, &TraversalIndex, &mut CheckPath), With<EnemyType>>,
-) {
-    for _ in &p_query {
-        for (path, traversal_index, mut check_path) in &mut query {
-            if (path.0.is_none() || traversal_index.0.is_none()) && !check_path.0 {
-                *check_path = CheckPath(true);
-            }
-        }
-    }
 }
 
 fn check_path_after_matrix_change(
@@ -146,7 +128,7 @@ fn calc_path(
     let g_s = (g_w * g_w + g_h * g_h).sqrt().ceil() as i32;
 
     query.par_for_each_mut(
-        32,
+        64,
         |(current_position, end_position, mut path, mut traversal_index, mut check_path)| {
             let start_position = if let (Some(path), Some(index)) = (&path.0, &traversal_index.0) {
                 if *index < path.len() - 1 {
@@ -214,7 +196,9 @@ fn track_player_system(
 ) {
     for position in &p_query {
         for (mut end_position, mut check_path) in &mut query {
-            *end_position = position.current_position.0.into();
+            if end_position.0 != position.current_position.0 {
+                *end_position = position.current_position.0.into();
+            }
 
             if !check_path.0 {
                 *check_path = CheckPath(true);

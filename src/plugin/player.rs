@@ -280,10 +280,14 @@ fn traverse_path(
                 }
             }
         } else {
-            *live_position = LivePosition((
+            let l_p = (
                 player_position.current_position.0 .0 as f32,
                 player_position.current_position.0 .1 as f32,
-            ));
+            );
+
+            if l_p != live_position.0 {
+                *live_position = LivePosition(l_p);
+            }
         }
 
         *visibility = Visibility::VISIBLE;

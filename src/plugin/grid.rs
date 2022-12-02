@@ -129,7 +129,7 @@ fn render_user_position_system(
     node_size: Res<NodeSize>,
     mut pos_query: Query<(&UserPosition, &mut Transform), Changed<UserPosition>>,
     query: Query<&Position, With<Node>>,
-    p_query: Query<&LivePosition, Or<(Changed<PlayerPosition>, Changed<LivePosition>)>>,
+    p_query: Query<&LivePosition>,
 ) {
     for (user_position, mut transform) in &mut pos_query {
         for position in &query {
