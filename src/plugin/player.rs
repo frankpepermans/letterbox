@@ -198,17 +198,10 @@ fn traverse_path(
             let col_0 = from.1 as f32;
             let col_1 = to.0 .1 as f32;
 
-            *live_position = if row_0 != row_1 {
-                LivePosition((
-                    row_0 + (row_1 - row_0) * delta_factor,
-                    col_0 + (col_1 - col_0) * delta_factor,
-                ))
-            } else {
-                LivePosition((
-                    row_0 + (row_1 - row_0) * delta_factor,
-                    col_0 + (col_1 - col_0) * delta_factor,
-                ))
-            };
+            *live_position = LivePosition((
+                row_0 + (row_1 - row_0) * delta_factor,
+                col_0 + (col_1 - col_0) * delta_factor,
+            ));
 
             if at_end {
                 if let Some(down_key) = key_state.down_key {

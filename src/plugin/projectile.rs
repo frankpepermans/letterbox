@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use bevy::prelude::*;
 
 use crate::{
-    game::{astar::manhattan_heuristic, matrix::Matrix, node::Node},
+    game::{astar::manhattan_heuristic, coordinates::Coordinates, matrix::Matrix, node::Node},
     LivePosition, NodeSize, Path, Player, PlayerPosition, ProjectilePosition, ProjectileSprites,
     TraversalIndex,
 };
@@ -44,7 +44,7 @@ impl Plugin for ProjectilePlugin {
 fn setup_system(mut commands: Commands) {
     commands
         .spawn(Projectile {
-            count: ProjectileCount(1),
+            count: ProjectileCount(5),
             piercing_count: PiercingCount(0),
         })
         .insert(AnimationTimer(Timer::from_seconds(
@@ -69,52 +69,59 @@ fn launch_projectiles(
         if timer.just_finished() {
             let tuple = p_query.single();
             let (p, l) = (tuple.0.current_position, tuple.1);
+            let mut closest_target: Option<(i32, Coordinates)> = None;
 
-            let mut valid_positions = e_query
-                .into_iter()
-                .filter_map(|(path, traversal_index)| {
-                    if let (Some(path), Some(traversal_index)) = (&path.0, &traversal_index.0) {
-                        let position = path[*traversal_index];
-                        let mut delta = l.0;
-                        let angle = (position.1 as f32 - l.0 .1 as f32)
-                            .atan2(position.0 as f32 - l.0 .0 as f32)
-                            + PI;
-                        let a_cos = angle.cos() / 6.;
-                        let a_sin = angle.sin() / 6.;
-                        let mut delta_r = (delta.0.round() as usize, delta.1.round() as usize);
+            e_query.into_iter().for_each(|(path, traversal_index)| {
+                if let (Some(path), Some(traversal_index)) = (&path.0, &traversal_index.0) {
+                    let position = path[*traversal_index];
+                    let mut delta = l.0;
+                    let angle = (position.1 as f32 - l.0 .1 as f32)
+                        .atan2(position.0 as f32 - l.0 .0 as f32)
+                        + PI;
+                    let a_cos = angle.cos() / 6.;
+                    let a_sin = angle.sin() / 6.;
+                    let mut delta_r = (delta.0.round() as usize, delta.1.round() as usize);
+                    let mut reachable = true;
 
-                        while delta_r != position {
-                            delta = (delta.0 - a_cos, delta.1 - a_sin);
-                            delta_r = (delta.0.round() as usize, delta.1.round() as usize);
+                    while delta_r != position {
+                        delta = (delta.0 - a_cos, delta.1 - a_sin);
+                        delta_r = (delta.0.round() as usize, delta.1.round() as usize);
 
-                            if matrix[delta_r] == Node::closed() {
-                                return None;
-                            }
+                        if matrix[delta_r] == Node::closed() {
+                            reachable = false;
                         }
+                    }
 
+                    if reachable {
                         let d = manhattan_heuristic(&p.0, &position);
 
                         if d <= 10 {
-                            Some((d, position))
-                        } else {
-                            None
+                            closest_target = match closest_target {
+                                Some(value) => {
+                                    if d < value.0 {
+                                        Some((d, position))
+                                    } else {
+                                        closest_target
+                                    }
+                                }
+                                _ => Some((d, position)),
+                            }
                         }
-                    } else {
-                        None
                     }
-                })
-                .collect::<Vec<_>>();
+                }
+            });
 
-            valid_positions.sort_by(|a, b| a.0.cmp(&b.0));
+            if let Some(closest_target) = closest_target {
+                let degree_delta = PI / 18.;
+                let angle_delta = (count.0 - 1) as f32 * degree_delta / 2.;
 
-            if valid_positions.len() > 0 {
-                let size = (valid_positions.len() - 1).min(count.0 as usize);
-
-                [0..size].iter().enumerate().for_each(|i| {
-                    let target_position = valid_positions[i.0].1;
+                for i in 0..count.0 {
+                    let target_position = closest_target.1;
                     let angle = (target_position.1 as f32 - l.0 .1 as f32)
                         .atan2(target_position.0 as f32 - l.0 .0 as f32)
-                        + PI;
+                        + PI
+                        - angle_delta
+                        + i as f32 * degree_delta;
 
                     commands.spawn((
                         SpriteSheetBundle {
@@ -136,7 +143,7 @@ fn launch_projectiles(
                         AnimationTimer(Timer::from_seconds(1. / 60., TimerMode::Repeating)),
                         ProjectilePosition(l.0),
                     ));
-                });
+                }
             }
         }
     }
