@@ -47,10 +47,10 @@ impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app.add_startup_system_to_stage(StartupStage::PostStartup, setup_system)
             .add_system(track_player_system)
-            .add_system(calc_path.after(track_player_system))
+            .add_system(calc_path)
             .add_system(check_path_after_matrix_change)
-            .add_system(traverse_path.after(calc_path))
-            .add_system(increment_path_traversal.after(traverse_path))
+            .add_system(traverse_path)
+            .add_system(increment_path_traversal)
             .add_system(animate_sprite)
             .add_system(hit_test_projectiles)
             .add_system(animate_frag_sprite);
@@ -247,14 +247,13 @@ fn increment_path_traversal(
                     }
                 }
 
-                let at_end = did_pos_change
-                    || match animation_sequence.snap {
-                        Some(snap) => {
-                            (time.elapsed() - snap).as_millis()
-                                >= animation_sequence.duration.as_millis()
-                        }
-                        None => true,
-                    };
+                let at_end = match animation_sequence.snap {
+                    Some(snap) => {
+                        (time.elapsed() - snap).as_millis()
+                            >= animation_sequence.duration.as_millis()
+                    }
+                    None => true,
+                };
 
                 if at_end {
                     *animation_sequence = AnimationSequence {
@@ -309,7 +308,6 @@ fn traverse_path(
                         (position.1 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
                     transform.translation.y =
                         (live_position.0 .0 - position.0) * node_size.0 .1 - node_size.0 .1 / 2.;
-
                     if at_end {
                         *traversal_index = TraversalIndex(Some(index + 1));
                     }
@@ -395,8 +393,14 @@ fn hit_test_projectiles(
     e_query: Query<(Entity, &Transform, &Path, &TraversalIndex)>,
     p_query: Query<&PlayerPosition, With<LivePosition>>,
 ) {
+    let mut despawned = Vec::new();
+
     for (_entity, transform) in &query {
         for (enemy_entity, enemy_transform, path, traversal_index) in &e_query {
+            if despawned.contains(&enemy_entity) {
+                break;
+            }
+
             if let (Some(path), Some(traversal_index)) = (&path.0, &traversal_index.0) {
                 let hit_box = Rect::new(
                     enemy_transform.translation.x - node_size.0 .0 / 2.,
@@ -406,6 +410,7 @@ fn hit_test_projectiles(
                 );
 
                 if hit_box.contains(Vec2::new(transform.translation.x, transform.translation.y)) {
+                    despawned.push(enemy_entity);
                     //commands.entity(entity).despawn();
                     commands.entity(enemy_entity).despawn();
 
