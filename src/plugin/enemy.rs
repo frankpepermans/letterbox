@@ -38,6 +38,9 @@ struct CheckPath(bool);
 #[derive(Component, Deref, DerefMut)]
 struct AnimationTimer(Timer);
 
+#[derive(Component, Deref, DerefMut)]
+struct TraversalCompleted(bool);
+
 #[derive(Component)]
 struct FraggedAt(Coordinates);
 
@@ -216,6 +219,7 @@ fn increment_path_traversal(
             &TraversalIndex,
             &EnemyType,
             &mut AnimationSequence,
+            &mut TraversalCompleted,
             &mut Position,
             &mut Handle<TextureAtlas>,
         ),
@@ -227,6 +231,7 @@ fn increment_path_traversal(
         traversal_index,
         enemy_type,
         mut animation_sequence,
+        mut traversal_completed,
         mut current_position,
         mut texture_atlas_handle,
     ) in &mut query
@@ -247,15 +252,8 @@ fn increment_path_traversal(
                     }
                 }
 
-                let at_end = match animation_sequence.snap {
-                    Some(snap) => {
-                        (time.elapsed() - snap).as_millis()
-                            >= animation_sequence.duration.as_millis()
-                    }
-                    None => true,
-                };
-
-                if at_end {
+                if traversal_completed.0 {
+                    *traversal_completed = TraversalCompleted(false);
                     *animation_sequence = AnimationSequence {
                         duration: animation_sequence.duration,
                         snap: Some(time.elapsed()),
@@ -272,6 +270,7 @@ fn traverse_path(
     mut query: Query<(
         &Path,
         &AnimationSequence,
+        &mut TraversalCompleted,
         &mut Transform,
         &mut TraversalIndex,
         &mut Visibility,
@@ -279,8 +278,14 @@ fn traverse_path(
     p_query: Query<&LivePosition>,
 ) {
     for live_position in &p_query {
-        for (path, animation_sequence, mut transform, mut traversal_index, mut visibility) in
-            &mut query
+        for (
+            path,
+            animation_sequence,
+            mut traversal_completed,
+            mut transform,
+            mut traversal_index,
+            mut visibility,
+        ) in &mut query
         {
             let params = (&path.0, traversal_index.0, animation_sequence.snap);
 
@@ -308,7 +313,9 @@ fn traverse_path(
                         (position.1 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
                     transform.translation.y =
                         (live_position.0 .0 - position.0) * node_size.0 .1 - node_size.0 .1 / 2.;
-                    if at_end {
+
+                    if at_end && !traversal_completed.0 {
+                        *traversal_completed = TraversalCompleted(true);
                         *traversal_index = TraversalIndex(Some(index + 1));
                     }
 
@@ -491,6 +498,7 @@ fn spawn_enemy(
                 visibility: Visibility::INVISIBLE,
                 ..default()
             },
+            TraversalCompleted(true),
             AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
         ));
 }
