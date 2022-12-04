@@ -1,7 +1,5 @@
 #![feature(binary_heap_retain)]
 
-use std::time::Duration;
-
 use bevy::prelude::*;
 use game::{coordinates::Coordinates, node::Node};
 
@@ -41,12 +39,6 @@ pub struct UserPosition {
 
 #[derive(Component, Debug, Clone, Copy)]
 struct ProjectilePosition(pub (f32, f32));
-
-#[derive(Component)]
-struct AnimationSequence {
-    snap: Option<Duration>,
-    duration: Duration,
-}
 
 #[derive(Component, Debug)]
 struct PlayerPosition {

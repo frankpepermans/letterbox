@@ -1,10 +1,9 @@
 use bevy::prelude::*;
 use rand::prelude::*;
-use std::time::Duration;
 
 use crate::{
-    game::matrix::Matrix, game::movement::Movement, game::node::Node, AnimationSequence,
-    LivePosition, NodeSize, Player, PlayerPosition, PlayerSprites, Position,
+    game::matrix::Matrix, game::movement::Movement, game::node::Node, LivePosition, NodeSize,
+    Player, PlayerPosition, PlayerSprites, Position,
 };
 
 use super::{grid::OpenNodes, projectile::ProjectilePlugin};
@@ -18,6 +17,9 @@ struct KeyState {
 
 #[derive(Component, Deref, DerefMut)]
 struct AnimationTimer(Timer);
+
+#[derive(Component, Deref, DerefMut)]
+struct WalkAnimationTimer(Timer);
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
@@ -68,20 +70,19 @@ fn setup_system(
             },
             AnimationTimer(Timer::from_seconds(0.15, TimerMode::Repeating)),
         ))
-        .insert(AnimationSequence {
-            duration: Duration::from_millis(200),
-            snap: None,
-        })
+        .insert(WalkAnimationTimer(Timer::from_seconds(
+            0.2,
+            TimerMode::Repeating,
+        )))
         .insert(KeyState { down_key: None });
 }
 
 fn update_player_position_system(
     key_code: Res<Input<KeyCode>>,
-    time: Res<Time>,
-    mut query: Query<(&mut PlayerPosition, &mut AnimationSequence, &mut KeyState), With<Player>>,
+    mut query: Query<(&mut PlayerPosition, &mut KeyState), With<Player>>,
     matrix: Res<Matrix<Node>>,
 ) {
-    for (mut position, mut animation_sequence, mut key_state) in &mut query {
+    for (mut position, mut key_state) in &mut query {
         if key_code.just_released(KeyCode::Left) && key_state.down_key == Some(KeyCode::Left) {
             *key_state = KeyState { down_key: None };
         } else if key_code.just_released(KeyCode::Right)
@@ -143,18 +144,6 @@ fn update_player_position_system(
                     };
                 }
             }
-
-            if key_code.any_just_pressed([
-                KeyCode::Left,
-                KeyCode::Right,
-                KeyCode::Up,
-                KeyCode::Down,
-            ]) {
-                *animation_sequence = AnimationSequence {
-                    duration: animation_sequence.duration,
-                    snap: Some(time.elapsed()),
-                };
-            }
         }
     }
 }
@@ -163,7 +152,7 @@ fn traverse_path(
     time: Res<Time>,
     mut query: Query<
         (
-            &mut AnimationSequence,
+            &mut WalkAnimationTimer,
             &mut PlayerPosition,
             &mut Visibility,
             &mut LivePosition,
@@ -174,30 +163,22 @@ fn traverse_path(
     matrix: Res<Matrix<Node>>,
 ) {
     for (
-        mut animation_sequence,
+        mut walk_animation_timer,
         mut player_position,
         mut visibility,
         mut live_position,
         key_state,
     ) in &mut query
     {
-        let params = (player_position.next_position, animation_sequence.snap);
-        let l_p = if let (Some(next_position), Some(start_duration)) = params {
-            let delta = time.elapsed() - start_duration;
-            let mut delta_factor =
-                delta.as_millis() as f32 / animation_sequence.duration.as_millis() as f32;
-            let at_end = delta_factor >= 1.;
+        let l_p = if let Some(next_position) = player_position.next_position {
+            walk_animation_timer.tick(time.delta());
+
+            let mut delta_factor = walk_animation_timer.elapsed().as_millis() as f32
+                / walk_animation_timer.duration().as_millis() as f32;
 
             delta_factor = delta_factor.clamp(0., 1.);
 
-            let from = player_position.current_position.0;
-            let to = next_position;
-            let row_0 = from.0 as f32;
-            let row_1 = to.0 .0 as f32;
-            let col_0 = from.1 as f32;
-            let col_1 = to.0 .1 as f32;
-
-            if at_end {
+            if walk_animation_timer.just_finished() {
                 if let Some(down_key) = key_state.down_key {
                     match down_key {
                         KeyCode::Left => {
@@ -254,11 +235,6 @@ fn traverse_path(
                         }
                         _ => {}
                     }
-
-                    *animation_sequence = AnimationSequence {
-                        duration: animation_sequence.duration,
-                        snap: Some(time.elapsed()),
-                    };
                 } else {
                     *player_position = PlayerPosition {
                         current_position: next_position,
@@ -267,11 +243,20 @@ fn traverse_path(
                 }
             }
 
+            let from = player_position.current_position.0;
+            let to = next_position;
+            let row_0 = from.0 as f32;
+            let row_1 = to.0 .0 as f32;
+            let col_0 = from.1 as f32;
+            let col_1 = to.0 .1 as f32;
+
             (
                 row_0 + (row_1 - row_0) * delta_factor,
                 col_0 + (col_1 - col_0) * delta_factor,
             )
         } else {
+            walk_animation_timer.reset();
+
             (
                 player_position.current_position.0 .0 as f32,
                 player_position.current_position.0 .1 as f32,

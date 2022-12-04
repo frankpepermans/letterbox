@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
-    time::Duration,
 };
 
 use bevy::prelude::*;
@@ -13,9 +12,8 @@ use crate::{
         node::{Entry, Node},
     },
     game::{coordinates::Coordinates, matrix::Matrix},
-    AnimationSequence, EndPosition, EnemyCount, EnemySprites, EnemyType, EnemyTypeValue,
-    FragSprites, LivePosition, NodeSize, Path, Player, PlayerPosition, Position,
-    ProjectilePosition, TraversalIndex,
+    EndPosition, EnemyCount, EnemySprites, EnemyType, EnemyTypeValue, FragSprites, LivePosition,
+    NodeSize, Path, Player, PlayerPosition, Position, ProjectilePosition, TraversalIndex,
 };
 
 use super::grid::OpenNodes;
@@ -39,7 +37,7 @@ struct CheckPath(bool);
 struct AnimationTimer(Timer);
 
 #[derive(Component, Deref, DerefMut)]
-struct TraversalCompleted(bool);
+struct WalkAnimationTimer(Timer);
 
 #[derive(Component)]
 struct FraggedAt(Coordinates);
@@ -113,15 +111,13 @@ fn calc_path(
     matrix: Res<Matrix<Node>>,
     windows: Res<Windows>,
     node_size: Res<NodeSize>,
-    mut query: Query<
-        (
-            &Position,
-            &EndPosition,
-            &mut Path,
-            &mut TraversalIndex,
-            &mut CheckPath,
-        ),
-    >,
+    mut query: Query<(
+        &Position,
+        &EndPosition,
+        &mut Path,
+        &mut TraversalIndex,
+        &mut CheckPath,
+    )>,
 ) {
     let partial_paths = Arc::new(Mutex::new(HashMap::new()));
     let window = windows.primary();
@@ -210,30 +206,20 @@ fn track_player_system(
 }
 
 fn increment_path_traversal(
-    time: Res<Time>,
     enemy_sprites: Res<EnemySprites>,
     mut query: Query<
         (
             &Path,
             &TraversalIndex,
             &EnemyType,
-            &mut AnimationSequence,
-            &mut TraversalCompleted,
             &mut Position,
             &mut Handle<TextureAtlas>,
         ),
         Or<(Changed<TraversalIndex>, Changed<Path>)>,
     >,
 ) {
-    for (
-        path,
-        traversal_index,
-        enemy_type,
-        mut animation_sequence,
-        mut traversal_completed,
-        mut current_position,
-        mut texture_atlas_handle,
-    ) in &mut query
+    for (path, traversal_index, enemy_type, mut current_position, mut texture_atlas_handle) in
+        &mut query
     {
         if let (Some(p), Some(index)) = (&path.0, traversal_index.0) {
             if index < p.len() - 1 {
@@ -250,14 +236,6 @@ fn increment_path_traversal(
                         }
                     }
                 }
-
-                if traversal_completed.0 {
-                    *traversal_completed = TraversalCompleted(false);
-                    *animation_sequence = AnimationSequence {
-                        duration: animation_sequence.duration,
-                        snap: Some(time.elapsed()),
-                    };
-                }
             }
         }
     }
@@ -268,11 +246,10 @@ fn traverse_path(
     node_size: Res<NodeSize>,
     mut query: Query<(
         &Path,
-        &AnimationSequence,
-        &mut TraversalCompleted,
         &mut Transform,
         &mut TraversalIndex,
         &mut Visibility,
+        &mut WalkAnimationTimer,
     )>,
     p_query: Query<&LivePosition>,
 ) {
@@ -282,25 +259,25 @@ fn traverse_path(
 
     let live_position = p_query.single();
 
-    for (
-        path,
-        animation_sequence,
-        mut traversal_completed,
-        mut transform,
-        mut traversal_index,
-        mut visibility,
-    ) in &mut query
+    for (path, mut transform, mut traversal_index, mut visibility, mut walk_animation_timer) in
+        &mut query
     {
-        let params = (&path.0, traversal_index.0, animation_sequence.snap);
+        let params = (&path.0, traversal_index.0);
 
-        if let (Some(path), Some(index), Some(start_duration)) = params {
+        walk_animation_timer.tick(time.delta());
+
+        if let (Some(path), Some(mut index)) = params {
             if index < path.len() - 1 {
-                let delta = time.elapsed() - start_duration;
-                let mut delta_factor =
-                    delta.as_millis() as f32 / animation_sequence.duration.as_millis() as f32;
-                let at_end = delta_factor >= 1.;
+                let mut delta_factor = walk_animation_timer.elapsed().as_millis() as f32
+                    / walk_animation_timer.duration().as_millis() as f32;
 
                 delta_factor = delta_factor.clamp(0., 1.);
+
+                if walk_animation_timer.just_finished() {
+                    index += 1;
+
+                    *traversal_index = TraversalIndex(Some(index));
+                }
 
                 let from = path[index];
                 let to = path[index + 1];
@@ -317,11 +294,6 @@ fn traverse_path(
                     (position.1 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
                 transform.translation.y =
                     (live_position.0 .0 - position.0) * node_size.0 .1 - node_size.0 .1 / 2.;
-
-                if at_end && !traversal_completed.0 {
-                    *traversal_completed = TraversalCompleted(true);
-                    *traversal_index = TraversalIndex(Some(index + 1));
-                }
 
                 *visibility = Visibility::VISIBLE;
             }
@@ -487,10 +459,6 @@ fn spawn_enemy(
             traversal_index: TraversalIndex(None),
         })
         .insert(CheckPath(true))
-        .insert(AnimationSequence {
-            duration: Duration::from_millis(150 + (rng.gen::<f32>() * 1500.) as u64),
-            snap: None,
-        })
         .insert(EnemyType { type_value })
         .insert((
             SpriteSheetBundle {
@@ -509,7 +477,10 @@ fn spawn_enemy(
                 visibility: Visibility::INVISIBLE,
                 ..default()
             },
-            TraversalCompleted(true),
             AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
+            WalkAnimationTimer(Timer::from_seconds(
+                0.15 + (rng.gen::<f32>() * 1.5),
+                TimerMode::Repeating,
+            )),
         ));
 }
