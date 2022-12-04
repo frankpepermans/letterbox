@@ -270,7 +270,8 @@ fn modify_single_node_system(
 // see https://github.com/klangner/mapgen.rs/blob/master/demo/src/lib.rs
 fn prepare_grid(size: &Res<GridSize>, m: &mut Matrix<Node>) -> Vec<Coordinates> {
     let mut t_rng = rand::thread_rng();
-    let mut rng = StdRng::seed_from_u64(t_rng.gen());
+    let seed = t_rng.gen();
+    let mut rng = StdRng::seed_from_u64(seed);
     let rows = size.0 .0;
     let cols = size.0 .1;
     let map = MapBuilder::new(rows, cols)

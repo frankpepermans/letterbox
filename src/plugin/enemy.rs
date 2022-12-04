@@ -52,8 +52,8 @@ impl Plugin for EnemyPlugin {
             .add_system(track_player_system)
             .add_system(calc_path)
             .add_system(check_path_after_matrix_change)
-            .add_system(traverse_path)
-            .add_system(increment_path_traversal)
+            .add_system(traverse_path.after(calc_path))
+            .add_system(increment_path_traversal.after(traverse_path))
             .add_system(animate_sprite)
             .add_system(hit_test_projectiles)
             .add_system(animate_frag_sprite);
@@ -121,7 +121,6 @@ fn calc_path(
             &mut TraversalIndex,
             &mut CheckPath,
         ),
-        Changed<CheckPath>,
     >,
 ) {
     let partial_paths = Arc::new(Mutex::new(HashMap::new()));

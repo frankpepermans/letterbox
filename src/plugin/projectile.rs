@@ -180,26 +180,28 @@ fn animate_projectiles(
     )>,
     p_query: Query<&LivePosition, With<Player>>,
 ) {
+    if p_query.is_empty() {
+        return;
+    }
+
     for (angle, mut initial_position, mut timer, mut transform, mut visibility) in &mut query {
         timer.tick(time.delta());
 
         if timer.just_finished() {
-            for live_position in &p_query {
-                *initial_position = ProjectilePosition((
-                    initial_position.0 .0 - angle.0.cos() / 6.,
-                    initial_position.0 .1 - angle.0.sin() / 6.,
-                ));
+            let live_position = p_query.single();
 
-                transform.translation.x = (initial_position.0 .1 - live_position.0 .1)
-                    * node_size.0 .0
-                    + node_size.0 .0 / 2.;
-                transform.translation.y = (live_position.0 .0 - initial_position.0 .0)
-                    * node_size.0 .1
-                    - node_size.0 .1 / 2.;
+            *initial_position = ProjectilePosition((
+                initial_position.0 .0 - angle.0.cos() / 6.,
+                initial_position.0 .1 - angle.0.sin() / 6.,
+            ));
 
-                if !visibility.is_visible {
-                    *visibility = Visibility::VISIBLE;
-                }
+            transform.translation.x =
+                (initial_position.0 .1 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
+            transform.translation.y =
+                (live_position.0 .0 - initial_position.0 .0) * node_size.0 .1 - node_size.0 .1 / 2.;
+
+            if !visibility.is_visible {
+                *visibility = Visibility::VISIBLE;
             }
         }
     }
