@@ -275,6 +275,7 @@ fn traverse_path(
 
                 if walk_animation_timer.just_finished() {
                     index += 1;
+                    delta_factor = 0.;
 
                     *traversal_index = TraversalIndex(Some(index));
                 }

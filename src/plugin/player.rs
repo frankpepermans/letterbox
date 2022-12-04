@@ -179,6 +179,8 @@ fn traverse_path(
             delta_factor = delta_factor.clamp(0., 1.);
 
             if walk_animation_timer.just_finished() {
+                delta_factor = 0.;
+
                 if let Some(down_key) = key_state.down_key {
                     match down_key {
                         KeyCode::Left => {
