@@ -13,7 +13,7 @@ use letterbox::{
 };
 
 // (rows, cols)
-const GRID_SIZE: (usize, usize) = (100, 100);
+const GRID_SIZE: (usize, usize) = (120, 120);
 // (width, height) in pixels
 const NODE_SIZE: (f32, f32) = (48., 48.);
 

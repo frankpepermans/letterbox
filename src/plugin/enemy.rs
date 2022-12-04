@@ -277,50 +277,54 @@ fn traverse_path(
     )>,
     p_query: Query<&LivePosition>,
 ) {
-    for live_position in &p_query {
-        for (
-            path,
-            animation_sequence,
-            mut traversal_completed,
-            mut transform,
-            mut traversal_index,
-            mut visibility,
-        ) in &mut query
-        {
-            let params = (&path.0, traversal_index.0, animation_sequence.snap);
+    if p_query.is_empty() {
+        return;
+    }
 
-            if let (Some(path), Some(index), Some(start_duration)) = params {
-                if index < path.len() - 1 {
-                    let delta = time.elapsed() - start_duration;
-                    let mut delta_factor =
-                        delta.as_millis() as f32 / animation_sequence.duration.as_millis() as f32;
-                    let at_end = delta_factor >= 1.;
+    let live_position = p_query.single();
 
-                    delta_factor = delta_factor.clamp(0., 1.);
+    for (
+        path,
+        animation_sequence,
+        mut traversal_completed,
+        mut transform,
+        mut traversal_index,
+        mut visibility,
+    ) in &mut query
+    {
+        let params = (&path.0, traversal_index.0, animation_sequence.snap);
 
-                    let from = path[index];
-                    let to = path[index + 1];
-                    let row_0 = from.0 as f32;
-                    let row_1 = to.0 as f32;
-                    let col_0 = from.1 as f32;
-                    let col_1 = to.1 as f32;
-                    let position = (
-                        row_0 + (row_1 - row_0) * delta_factor,
-                        col_0 + (col_1 - col_0) * delta_factor,
-                    );
+        if let (Some(path), Some(index), Some(start_duration)) = params {
+            if index < path.len() - 1 {
+                let delta = time.elapsed() - start_duration;
+                let mut delta_factor =
+                    delta.as_millis() as f32 / animation_sequence.duration.as_millis() as f32;
+                let at_end = delta_factor >= 1.;
 
-                    transform.translation.x =
-                        (position.1 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
-                    transform.translation.y =
-                        (live_position.0 .0 - position.0) * node_size.0 .1 - node_size.0 .1 / 2.;
+                delta_factor = delta_factor.clamp(0., 1.);
 
-                    if at_end && !traversal_completed.0 {
-                        *traversal_completed = TraversalCompleted(true);
-                        *traversal_index = TraversalIndex(Some(index + 1));
-                    }
+                let from = path[index];
+                let to = path[index + 1];
+                let row_0 = from.0 as f32;
+                let row_1 = to.0 as f32;
+                let col_0 = from.1 as f32;
+                let col_1 = to.1 as f32;
+                let position = (
+                    row_0 + (row_1 - row_0) * delta_factor,
+                    col_0 + (col_1 - col_0) * delta_factor,
+                );
 
-                    *visibility = Visibility::VISIBLE;
+                transform.translation.x =
+                    (position.1 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
+                transform.translation.y =
+                    (live_position.0 .0 - position.0) * node_size.0 .1 - node_size.0 .1 / 2.;
+
+                if at_end && !traversal_completed.0 {
+                    *traversal_completed = TraversalCompleted(true);
+                    *traversal_index = TraversalIndex(Some(index + 1));
                 }
+
+                *visibility = Visibility::VISIBLE;
             }
         }
     }
@@ -400,7 +404,13 @@ fn hit_test_projectiles(
     e_query: Query<(Entity, &Transform, &Path, &TraversalIndex)>,
     p_query: Query<&PlayerPosition, With<LivePosition>>,
 ) {
+    if p_query.is_empty() {
+        return;
+    }
+
+    let player_position = p_query.single();
     let mut despawned = Vec::new();
+    let mut spawn_count = 0;
 
     for (_entity, transform) in &query {
         for (enemy_entity, enemy_transform, path, traversal_index) in &e_query {
@@ -421,8 +431,6 @@ fn hit_test_projectiles(
                     //commands.entity(entity).despawn();
                     commands.entity(enemy_entity).despawn();
 
-                    let player_position = p_query.single();
-
                     commands.spawn((
                         SpriteSheetBundle {
                             transform: Transform {
@@ -437,16 +445,20 @@ fn hit_test_projectiles(
                         FraggedAt(path[*traversal_index]),
                     ));
 
-                    spawn_enemy(
-                        &mut commands,
-                        player_position.current_position.0,
-                        &node_size,
-                        &open_nodes,
-                        &enemy_sprites,
-                    );
+                    spawn_count += 1;
                 }
             }
         }
+    }
+
+    for _i in 0..spawn_count {
+        spawn_enemy(
+            &mut commands,
+            player_position.current_position.0,
+            &node_size,
+            &open_nodes,
+            &enemy_sprites,
+        );
     }
 }
 

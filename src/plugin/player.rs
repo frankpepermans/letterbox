@@ -182,8 +182,7 @@ fn traverse_path(
     ) in &mut query
     {
         let params = (player_position.next_position, animation_sequence.snap);
-
-        if let (Some(next_position), Some(start_duration)) = params {
+        let l_p = if let (Some(next_position), Some(start_duration)) = params {
             let delta = time.elapsed() - start_duration;
             let mut delta_factor =
                 delta.as_millis() as f32 / animation_sequence.duration.as_millis() as f32;
@@ -197,11 +196,6 @@ fn traverse_path(
             let row_1 = to.0 .0 as f32;
             let col_0 = from.1 as f32;
             let col_1 = to.0 .1 as f32;
-
-            *live_position = LivePosition((
-                row_0 + (row_1 - row_0) * delta_factor,
-                col_0 + (col_1 - col_0) * delta_factor,
-            ));
 
             if at_end {
                 if let Some(down_key) = key_state.down_key {
@@ -272,17 +266,19 @@ fn traverse_path(
                     }
                 }
             }
+
+            (
+                row_0 + (row_1 - row_0) * delta_factor,
+                col_0 + (col_1 - col_0) * delta_factor,
+            )
         } else {
-            let l_p = (
+            (
                 player_position.current_position.0 .0 as f32,
                 player_position.current_position.0 .1 as f32,
-            );
+            )
+        };
 
-            if l_p != live_position.0 {
-                *live_position = LivePosition(l_p);
-            }
-        }
-
+        *live_position = LivePosition(l_p);
         *visibility = Visibility::VISIBLE;
     }
 }
