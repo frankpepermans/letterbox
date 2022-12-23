@@ -172,7 +172,7 @@ fn update_user_position_coordinates_system(
                     for mut user_position in &mut query {
                         let mut val = user_position.coordinates;
 
-                        if matrix.contains(position.0) {
+                        if matrix.contains(&position.0) {
                             val = Some(position.0);
                         }
 
@@ -229,7 +229,7 @@ fn modify_single_node_system(
             user_position.coordinates,
             user_position.cursor_pressed_state,
         ) {
-            if cursor_pressed_state == UserCursorPressedState::DOWN && matrix.contains(coordinates)
+            if cursor_pressed_state == UserCursorPressedState::DOWN && matrix.contains(&coordinates)
             {
                 let target_modification =
                     user_position

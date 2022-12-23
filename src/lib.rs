@@ -30,6 +30,9 @@ pub struct EnemyCount(pub i16);
 #[derive(Component, Debug)]
 struct Player {}
 
+#[derive(Resource)]
+pub struct ProjectileReach(pub i8);
+
 #[derive(Component)]
 pub struct UserPosition {
     pub coordinates: Option<Coordinates>,
@@ -60,6 +63,9 @@ impl Into<EndPosition> for Coordinates {
         EndPosition(self)
     }
 }
+
+#[derive(Component, Deref, DerefMut)]
+struct WalkAnimationTimer(Timer);
 
 #[derive(Component)]
 struct EnemyType {
@@ -362,6 +368,40 @@ impl FragSprites {
             size: 24.,
             blood: texture_atlases.add(TextureAtlas::from_grid(
                 asset_server.load("enemy_frag.png"),
+                Vec2::new(32., 32.),
+                6,
+                1,
+                None,
+                None,
+            )),
+        }
+    }
+}
+
+#[derive(Resource)]
+pub struct PowerUpSprites {
+    pub size: f32,
+    pub speed: Handle<TextureAtlas>,
+    pub projectile_count: Handle<TextureAtlas>,
+}
+
+impl PowerUpSprites {
+    pub fn init(
+        asset_server: &Res<AssetServer>,
+        texture_atlases: &mut ResMut<Assets<TextureAtlas>>,
+    ) -> Self {
+        Self {
+            size: 32.,
+            speed: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("power_up_speed.png"),
+                Vec2::new(32., 32.),
+                6,
+                1,
+                None,
+                None,
+            )),
+            projectile_count: texture_atlases.add(TextureAtlas::from_grid(
+                asset_server.load("power_up_projectile.png"),
                 Vec2::new(32., 32.),
                 6,
                 1,

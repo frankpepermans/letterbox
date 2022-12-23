@@ -1,6 +1,6 @@
 use super::coordinates::Coordinates;
 
-#[derive(Debug, Clone, Copy, Ord, Eq)]
+#[derive(Debug, Clone, Copy, Eq)]
 pub struct PathNode {
     pub index: Coordinates,
     pub f: i32,
@@ -41,6 +41,12 @@ impl From<Coordinates> for PathNode {
             g: 0,
             parent: None,
         }
+    }
+}
+
+impl Ord for PathNode {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other.f.cmp(&self.f)
     }
 }
 

@@ -3,7 +3,7 @@ use rand::prelude::*;
 
 use crate::{
     game::matrix::Matrix, game::movement::Movement, game::node::Node, LivePosition, NodeSize,
-    Player, PlayerPosition, PlayerSprites, Position,
+    Player, PlayerPosition, PlayerSprites, Position, WalkAnimationTimer,
 };
 
 use super::{grid::OpenNodes, projectile::ProjectilePlugin};
@@ -17,9 +17,6 @@ struct KeyState {
 
 #[derive(Component, Deref, DerefMut)]
 struct AnimationTimer(Timer);
-
-#[derive(Component, Deref, DerefMut)]
-struct WalkAnimationTimer(Timer);
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {

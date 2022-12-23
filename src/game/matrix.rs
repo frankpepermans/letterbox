@@ -22,7 +22,7 @@ where
         Self { vec, rows, cols }
     }
 
-    pub fn contains(&self, coordinates: Coordinates) -> bool {
+    pub fn contains(&self, coordinates: &Coordinates) -> bool {
         self.rows > coordinates.0 && self.cols > coordinates.1
     }
 }

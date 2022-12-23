@@ -40,7 +40,7 @@ struct AnimationTimer(Timer);
 struct WalkAnimationTimer(Timer);
 
 #[derive(Component)]
-struct FraggedAt(Coordinates);
+struct FraggedAt((f32, f32));
 
 pub struct EnemyPlugin;
 
@@ -281,20 +281,26 @@ fn traverse_path(
                 }
 
                 let from = path[index];
-                let to = path[index + 1];
-                let row_0 = from.0 as f32;
-                let row_1 = to.0 as f32;
-                let col_0 = from.1 as f32;
-                let col_1 = to.1 as f32;
-                let position = (
-                    row_0 + (row_1 - row_0) * delta_factor,
-                    col_0 + (col_1 - col_0) * delta_factor,
-                );
 
-                transform.translation.x =
-                    (position.1 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
-                transform.translation.y =
-                    (live_position.0 .0 - position.0) * node_size.0 .1 - node_size.0 .1 / 2.;
+                if index < path.len() - 1 {
+                    let to = path[index + 1];
+                    let row_0 = from.0 as f32;
+                    let row_1 = to.0 as f32;
+                    let col_0 = from.1 as f32;
+                    let col_1 = to.1 as f32;
+                    let position = (
+                        row_0 + (row_1 - row_0) * delta_factor,
+                        col_0 + (col_1 - col_0) * delta_factor,
+                    );
+
+                    transform.translation.x =
+                        (position.1 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
+                    transform.translation.y =
+                        (live_position.0 .0 - position.0) * node_size.0 .1 - node_size.0 .1 / 2.;
+                } else {
+                    transform.translation.x = from.0 as f32;
+                    transform.translation.y = from.1 as f32;
+                }
 
                 *visibility = Visibility::VISIBLE;
             }
@@ -346,9 +352,9 @@ fn animate_frag_sprite(
         let live_position = p_query.single();
 
         transform.translation.x =
-            (fragged_at.0 .1 as f32 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
+            (fragged_at.0 .1 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
         transform.translation.y =
-            (live_position.0 .0 - fragged_at.0 .0 as f32) * node_size.0 .1 - node_size.0 .1 / 2.;
+            (live_position.0 .0 - fragged_at.0 .0) * node_size.0 .1 - node_size.0 .1 / 2.;
 
         timer.tick(time.delta());
 
@@ -373,52 +379,56 @@ fn hit_test_projectiles(
     enemy_sprites: Res<EnemySprites>,
     frag_sprites: Res<FragSprites>,
     query: Query<(Entity, &Transform), With<ProjectilePosition>>,
-    e_query: Query<(Entity, &Transform, &Path, &TraversalIndex)>,
-    p_query: Query<&PlayerPosition, With<LivePosition>>,
+    e_query: Query<(Entity, &Transform), With<TraversalIndex>>,
+    p_query: Query<(&PlayerPosition, &LivePosition)>,
 ) {
     if p_query.is_empty() {
         return;
     }
 
-    let player_position = p_query.single();
+    let (player_position, live_position) = p_query.single();
     let mut despawned = Vec::new();
     let mut spawn_count = 0;
 
     for (_entity, transform) in &query {
-        for (enemy_entity, enemy_transform, path, traversal_index) in &e_query {
+        for (enemy_entity, enemy_transform) in &e_query {
             if despawned.contains(&enemy_entity) {
                 break;
             }
 
-            if let (Some(path), Some(traversal_index)) = (&path.0, &traversal_index.0) {
-                let hit_box = Rect::new(
-                    enemy_transform.translation.x - node_size.0 .0 / 2.,
-                    enemy_transform.translation.y - node_size.0 .1 / 2.,
-                    enemy_transform.translation.x + node_size.0 .0 / 2.,
-                    enemy_transform.translation.y + node_size.0 .1 / 2.,
-                );
+            let hit_box = Rect::new(
+                enemy_transform.translation.x - node_size.0 .0 / 2.,
+                enemy_transform.translation.y - node_size.0 .1 / 2.,
+                enemy_transform.translation.x + node_size.0 .0 / 2.,
+                enemy_transform.translation.y + node_size.0 .1 / 2.,
+            );
 
-                if hit_box.contains(Vec2::new(transform.translation.x, transform.translation.y)) {
-                    despawned.push(enemy_entity);
-                    //commands.entity(entity).despawn();
-                    commands.entity(enemy_entity).despawn();
+            if hit_box.contains(Vec2::new(transform.translation.x, transform.translation.y)) {
+                let frag_translation_x = live_position.0 .0
+                    - (enemy_transform.translation.y + node_size.0 .1 / 2.) / node_size.0 .1;
+                let frag_translation_y = (enemy_transform.translation.x - node_size.0 .0 / 2.)
+                    / node_size.0 .0
+                    + live_position.0 .1;
 
-                    commands.spawn((
-                        SpriteSheetBundle {
-                            transform: Transform {
-                                scale: Vec3::splat(node_size.0 .0 as f32 / frag_sprites.size),
-                                translation: enemy_transform.translation,
-                                ..default()
-                            },
-                            texture_atlas: frag_sprites.blood.clone(),
+                despawned.push(enemy_entity);
+                //commands.entity(entity).despawn();
+                commands.entity(enemy_entity).despawn();
+
+                commands.spawn((
+                    SpriteSheetBundle {
+                        transform: Transform {
+                            scale: Vec3::splat(node_size.0 .0 as f32 / frag_sprites.size),
+                            translation: enemy_transform.translation,
                             ..default()
                         },
-                        AnimationTimer(Timer::from_seconds(0.15, TimerMode::Repeating)),
-                        FraggedAt(path[*traversal_index]),
-                    ));
+                        texture_atlas: frag_sprites.blood.clone(),
+                        ..default()
+                    },
+                    AnimationTimer(Timer::from_seconds(0.15, TimerMode::Repeating)),
+                    FraggedAt((frag_translation_x, frag_translation_y)),
+                ));
 
-                    spawn_count += 1;
-                }
+                spawn_count += 1;
             }
         }
     }
@@ -471,7 +481,7 @@ fn spawn_enemy(
                     translation: Vec3 {
                         x: 0.,
                         y: 0.,
-                        z: 100.,
+                        z: 100.5,
                     },
                     ..default()
                 },

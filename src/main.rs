@@ -7,9 +7,12 @@ use bevy::{
 
 use letterbox::{
     game::coordinates::Coordinates,
-    plugin::{assets::AssetsPlugin, enemy::EnemyPlugin, grid::GridPlugin, player::PlayerPlugin},
+    plugin::{
+        assets::AssetsPlugin, enemy::EnemyPlugin, grid::GridPlugin, player::PlayerPlugin,
+        power_up::PowerUpPlugin,
+    },
     AttackSprites, EnemyCount, EnemySprites, FragSprites, GridSize, NodeSize, PlayerSprites,
-    ProjectileSprites,
+    PowerUpSprites, ProjectileReach, ProjectileSprites,
 };
 
 // (rows, cols)
@@ -22,6 +25,7 @@ fn main() {
         .insert_resource(GridSize(GRID_SIZE))
         .insert_resource(NodeSize(NODE_SIZE))
         .insert_resource(EnemyCount(1000))
+        .insert_resource(ProjectileReach(5))
         .add_startup_system(setup_system)
         .add_plugins(
             DefaultPlugins
@@ -33,7 +37,6 @@ fn main() {
                         present_mode: PresentMode::AutoNoVsync,
                         ..default()
                     },
-
                     ..default()
                 }),
         )
@@ -43,6 +46,7 @@ fn main() {
         .add_plugin(GridPlugin)
         .add_plugin(PlayerPlugin)
         .add_plugin(EnemyPlugin)
+        .add_plugin(PowerUpPlugin)
         .run();
 }
 
@@ -63,6 +67,7 @@ fn setup_system(
     commands.insert_resource(EnemySprites::init(&asset_server, &mut texture_atlases));
     commands.insert_resource(ProjectileSprites::init(&asset_server, &mut texture_atlases));
     commands.insert_resource(FragSprites::init(&asset_server, &mut texture_atlases));
+    commands.insert_resource(PowerUpSprites::init(&asset_server, &mut texture_atlases));
 }
 
 #[derive(Component)]

@@ -4,15 +4,15 @@ use bevy::prelude::*;
 
 use crate::{
     game::{astar::manhattan_heuristic, coordinates::Coordinates, matrix::Matrix, node::Node},
-    LivePosition, NodeSize, Path, Player, PlayerPosition, ProjectilePosition, ProjectileSprites,
-    TraversalIndex,
+    LivePosition, NodeSize, Path, Player, PlayerPosition, ProjectilePosition, ProjectileReach,
+    ProjectileSprites, TraversalIndex,
 };
 
 #[derive(Component, Deref, DerefMut)]
 struct AnimationTimer(Timer);
 
 #[derive(Component)]
-pub(crate) struct ProjectileCount(i8);
+pub(crate) struct ProjectileCount(pub i8);
 
 #[derive(Component)]
 pub(crate) struct PiercingCount(i8);
@@ -44,7 +44,7 @@ impl Plugin for ProjectilePlugin {
 fn setup_system(mut commands: Commands) {
     commands
         .spawn(Projectile {
-            count: ProjectileCount(5),
+            count: ProjectileCount(1),
             piercing_count: PiercingCount(0),
         })
         .insert(AnimationTimer(Timer::from_seconds(
@@ -55,6 +55,7 @@ fn setup_system(mut commands: Commands) {
 
 fn launch_projectiles(
     mut commands: Commands,
+    projectile_reach: Res<ProjectileReach>,
     matrix: Res<Matrix<Node>>,
     node_size: Res<NodeSize>,
     projectile_sprites: Res<ProjectileSprites>,
@@ -95,7 +96,7 @@ fn launch_projectiles(
                     if reachable {
                         let d = manhattan_heuristic(&p.0, &position);
 
-                        if d <= 10 {
+                        if d <= projectile_reach.0 as i32 {
                             closest_target = match closest_target {
                                 Some(value) => {
                                     if d < value.0 {
