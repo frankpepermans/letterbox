@@ -4,8 +4,8 @@ use bevy::prelude::*;
 
 use crate::{
     game::{astar::manhattan_heuristic, coordinates::Coordinates, matrix::Matrix, node::Node},
-    LivePosition, NodeSize, Path, Player, PlayerPosition, ProjectilePosition, ProjectileReach,
-    ProjectileSprites, TraversalIndex,
+    Durability, LivePosition, NodeSize, Path, Player, PlayerPosition, ProjectilePosition,
+    ProjectileReach, ProjectileSprites, TraversalIndex,
 };
 
 #[derive(Component, Deref, DerefMut)]
@@ -142,6 +142,7 @@ fn launch_projectiles(
                         },
                         Angle(angle),
                         AnimationTimer(Timer::from_seconds(1. / 60., TimerMode::Repeating)),
+                        Durability(30),
                         ProjectilePosition(l.0),
                     ));
                 }

@@ -12,8 +12,9 @@ use crate::{
         node::{Entry, Node},
     },
     game::{coordinates::Coordinates, matrix::Matrix},
-    EndPosition, EnemyCount, EnemySprites, EnemyType, EnemyTypeValue, FragSprites, LivePosition,
-    NodeSize, Path, Player, PlayerPosition, Position, ProjectilePosition, TraversalIndex,
+    Durability, EndPosition, EnemyCount, EnemySprites, EnemyType, EnemyTypeValue, FragSprites,
+    Health, LivePosition, NodeSize, Path, Player, PlayerPosition, Position, ProjectilePosition,
+    TraversalIndex,
 };
 
 use super::grid::OpenNodes;
@@ -268,19 +269,23 @@ fn traverse_path(
 
         if let (Some(path), Some(mut index)) = params {
             if index < path.len() - 1 {
-                let mut delta_factor = walk_animation_timer.elapsed().as_millis() as f32
-                    / walk_animation_timer.duration().as_millis() as f32;
-
-                delta_factor = delta_factor.clamp(0., 1.);
+                let delta_factor: f32;
 
                 if walk_animation_timer.just_finished() {
                     index += 1;
                     delta_factor = 0.;
 
                     *traversal_index = TraversalIndex(Some(index));
+                } else {
+                    let elapsed = walk_animation_timer.elapsed().as_millis() as f32;
+                    let duration = walk_animation_timer.duration().as_millis() as f32;
+
+                    delta_factor = (elapsed / duration).clamp(0., 1.);
                 }
 
                 let from = path[index];
+                let d_x: f32;
+                let d_y: f32;
 
                 if index < path.len() - 1 {
                     let to = path[index + 1];
@@ -293,14 +298,17 @@ fn traverse_path(
                         col_0 + (col_1 - col_0) * delta_factor,
                     );
 
-                    transform.translation.x =
-                        (position.1 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
-                    transform.translation.y =
-                        (live_position.0 .0 - position.0) * node_size.0 .1 - node_size.0 .1 / 2.;
+                    d_x = (position.1 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
+                    d_y = (live_position.0 .0 - position.0) * node_size.0 .1 - node_size.0 .1 / 2.;
                 } else {
-                    transform.translation.x = from.0 as f32;
-                    transform.translation.y = from.1 as f32;
+                    d_x =
+                        (from.1 as f32 - live_position.0 .1) * node_size.0 .0 + node_size.0 .0 / 2.;
+                    d_y =
+                        (live_position.0 .0 - from.0 as f32) * node_size.0 .1 - node_size.0 .1 / 2.;
                 }
+
+                transform.translation.x = d_x;
+                transform.translation.y = d_y;
 
                 *visibility = Visibility::VISIBLE;
             }
@@ -378,8 +386,8 @@ fn hit_test_projectiles(
     open_nodes: Res<OpenNodes>,
     enemy_sprites: Res<EnemySprites>,
     frag_sprites: Res<FragSprites>,
-    query: Query<(Entity, &Transform), With<ProjectilePosition>>,
-    e_query: Query<(Entity, &Transform), With<TraversalIndex>>,
+    mut query: Query<(Entity, &Transform, &mut Durability), With<ProjectilePosition>>,
+    mut e_query: Query<(Entity, &Transform, &mut Health), With<CheckPath>>,
     p_query: Query<(&PlayerPosition, &LivePosition)>,
 ) {
     if p_query.is_empty() {
@@ -390,8 +398,8 @@ fn hit_test_projectiles(
     let mut despawned = Vec::new();
     let mut spawn_count = 0;
 
-    for (_entity, transform) in &query {
-        for (enemy_entity, enemy_transform) in &e_query {
+    for (entity, transform, mut p_durability) in &mut query {
+        for (enemy_entity, enemy_transform, mut e_health) in &mut e_query {
             if despawned.contains(&enemy_entity) {
                 break;
             }
@@ -409,26 +417,39 @@ fn hit_test_projectiles(
                 let frag_translation_y = (enemy_transform.translation.x - node_size.0 .0 / 2.)
                     / node_size.0 .0
                     + live_position.0 .1;
+                let can_despawn_enemy = e_health.0 > 0;
+                let can_despawn_projectile = p_durability.0 > 0;
 
-                despawned.push(enemy_entity);
-                //commands.entity(entity).despawn();
-                commands.entity(enemy_entity).despawn();
+                *e_health =
+                    Health((e_health.0 - p_durability.0.clamp(0, e_health.0)).clamp(0, u16::MAX));
+                *p_durability = Durability(
+                    (p_durability.0 - e_health.0.clamp(0, p_durability.0)).clamp(0, u16::MAX),
+                );
 
-                commands.spawn((
-                    SpriteSheetBundle {
-                        transform: Transform {
-                            scale: Vec3::splat(node_size.0 .0 as f32 / frag_sprites.size),
-                            translation: enemy_transform.translation,
+                if can_despawn_enemy && e_health.0 == 0 {
+                    despawned.push(enemy_entity);
+                    commands.entity(enemy_entity).despawn();
+
+                    commands.spawn((
+                        SpriteSheetBundle {
+                            transform: Transform {
+                                scale: Vec3::splat(node_size.0 .0 as f32 / frag_sprites.size),
+                                translation: enemy_transform.translation,
+                                ..default()
+                            },
+                            texture_atlas: frag_sprites.blood.clone(),
                             ..default()
                         },
-                        texture_atlas: frag_sprites.blood.clone(),
-                        ..default()
-                    },
-                    AnimationTimer(Timer::from_seconds(0.15, TimerMode::Repeating)),
-                    FraggedAt((frag_translation_x, frag_translation_y)),
-                ));
+                        AnimationTimer(Timer::from_seconds(0.15, TimerMode::Repeating)),
+                        FraggedAt((frag_translation_x, frag_translation_y)),
+                    ));
 
-                spawn_count += 1;
+                    spawn_count += 1;
+                }
+
+                if can_despawn_projectile && p_durability.0 == 0 {
+                    commands.entity(entity).despawn();
+                }
             }
         }
     }
@@ -469,6 +490,7 @@ fn spawn_enemy(
             path: Path(None),
             traversal_index: TraversalIndex(None),
         })
+        .insert(Health(100))
         .insert(CheckPath(true))
         .insert(EnemyType { type_value })
         .insert((

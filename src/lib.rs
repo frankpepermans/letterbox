@@ -72,6 +72,12 @@ struct EnemyType {
     type_value: EnemyTypeValue,
 }
 
+#[derive(Component)]
+pub struct Durability(pub u16);
+
+#[derive(Component)]
+pub struct Health(pub u16);
+
 #[derive(Resource)]
 pub struct EnemySprites {
     pub size: f32,

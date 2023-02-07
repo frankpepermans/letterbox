@@ -2,8 +2,8 @@ use bevy::prelude::*;
 use rand::prelude::*;
 
 use crate::{
-    game::matrix::Matrix, game::movement::Movement, game::node::Node, LivePosition, NodeSize,
-    Player, PlayerPosition, PlayerSprites, Position, WalkAnimationTimer,
+    game::matrix::Matrix, game::movement::Movement, game::node::Node, Health, LivePosition,
+    NodeSize, Player, PlayerPosition, PlayerSprites, Position, WalkAnimationTimer,
 };
 
 use super::{grid::OpenNodes, projectile::ProjectilePlugin};
@@ -49,6 +49,7 @@ fn setup_system(
             current_position: Position(start_position),
             next_position: None,
         })
+        .insert(Health(100))
         .insert(LivePosition((0., 0.)))
         .insert((
             SpriteSheetBundle {
